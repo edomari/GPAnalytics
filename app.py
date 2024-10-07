@@ -203,4 +203,4 @@ def result():
     return render_template('result.html', pilots_data = pilots_data, format_time = format_time, anno = anno)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
