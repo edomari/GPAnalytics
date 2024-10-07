@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleziona Gran Premio - MotoGP</title>
+    <style>
+        @font-face {
+            font-family: 'MioFont';
+            src: url('/static/fonts/MotoGPText-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body {
+            font-family: 'MioFont'; /* Aggiunto sans-serif come fallback */
+        }
+    </style>
+</head>
+<body>
+    <h1>Seleziona l'anno e il Gran Premio</h1>
+    <form action="/results" method="GET">
+        <!-- Selezione anno -->
+        <label for="anno">Anno:</label>
+        <select id="anno" name="anno">
+            {% for year in range(2006, 2025) %}
+                <option value="{{ year }}">{{ year }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="granPremio">Gran Premio:</label>
+        <select id="granPremio" name="granPremio">
+            <option value="val">Valencia</option>
+            <option value="qat">Qatar</option>
+            <option value="mal">Malesia</option>
+            <option value="tha">Thailandia</option>
+            <option value="aus">Australia</option>
+            <option value="ina">Indonesia</option>
+            <option value="jpn">Giappone</option>
+            <option value="ind">India</option>
+            <option value="rsm">San Marino</option>
+            <option value="cat">Catalogna</option>
+            <option value="aut">Austria</option>
+            <option value="gbr">Gran Bretagna</option>
+            <option value="ned">Paesi Bassi</option>
+            <option value="ger">Germania</option>
+            <option value="ita">Italia</option>
+            <option value="fra">Francia</option>
+            <option value="spa">Spagna</option>
+            <option value="ame">Americhe</option>
+            <option value="arg">Argentina</option>
+            <option value="por">Portogallo</option>
+        </select>
+
+        <button type="submit">Vai al PDF</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tempi sul giro per pilota - MotoGP {{anno}}</title>
+    <style>
+        @font-face {
+            font-family: 'MioFont';
+            src: url('/static/fonts/MotoGPText-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'MioFont', sans-serif;
+        }
+
+        .pilots-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .pilot {
+            width: 30%;
+            border: 1px solid #ddd;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .pilot h2 {
+            text-align: center;
+        }
+        .lap-time {
+            text-align: center;
+            padding: 5px 0;
+        }
+        .average-time {
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        /* Stile per i pulsanti verdi e rossi */
+        .selected {
+            background-color: green;
+            color: white;
+        }
+        .unselected {
+            background-color: red;
+            color: white;
+        }
+        h1{
+            text-align: center;
+        }
+    </style>
+    <script>
+        // Oggetto per tenere traccia dei tempi selezionati per ogni pilota
+        let selectedLapTimes = {};
+
+        function initializeSelectedTimes(pilotIndex, lapTimes) {
+            selectedLapTimes[pilotIndex] = [...lapTimes];
+            calculateAverageTime(pilotIndex);
+        }
+
+        function toggleLapTime(pilotIndex, lapTime, buttonElement) {
+            if (!selectedLapTimes[pilotIndex]) {
+                selectedLapTimes[pilotIndex] = [];
+            }
+
+            const index = selectedLapTimes[pilotIndex].indexOf(lapTime);
+            if (index > -1) {
+                selectedLapTimes[pilotIndex].splice(index, 1);
+                buttonElement.classList.remove('selected');
+                buttonElement.classList.add('unselected');
+            } else {
+                selectedLapTimes[pilotIndex].push(lapTime);
+                buttonElement.classList.remove('unselected');
+                buttonElement.classList.add('selected');
+            }
+            calculateAverageTime(pilotIndex);
+        }
+
+        function calculateAverageTime(pilotIndex) {
+            const averageDisplay = document.getElementById(`average-time-${pilotIndex}`);
+
+            if (!selectedLapTimes[pilotIndex] || selectedLapTimes[pilotIndex].length === 0) {
+                averageDisplay.innerText = 'Passo gara: Non selezionato';
+                return;
+            }
+
+            const total = selectedLapTimes[pilotIndex].reduce((sum, time) => sum + timeToSeconds(time), 0);
+            const average = total / selectedLapTimes[pilotIndex].length;
+
+            averageDisplay.innerText = 'Passo gara: ' + formatTime(average);
+        }
+
+        function timeToSeconds(time) {
+            const parts = time.split(':');
+            return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(3);
+            return `${minutes}:${secs.padStart(5, '0')}`;
+        }
+    </script>
+</head>
+<body>
+    <h1>Tempi sul giro per pilota - MotoGP 2024</h1>
+    {% for i in range(0, pilots_data|length, 3) %}
+        <div class="pilots-row">
+            {% for j in range(3) %}
+                {% set pilot_index = i + j %}
+                {% if pilot_index < pilots_data|length %}
+                    {% set pilot_name, pilot_times = pilots_data[pilot_index] %}
+                    <div class="pilot">
+                        <h2>{{ pilot_name }} - {{ pilot_index + 1 }}&deg</h2>
+
+                        <script>
+                            // Inizializzare i tempi selezionati per ogni pilota
+                            document.addEventListener('DOMContentLoaded', function() {
+                                initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ format_time(pilot_times[k]) }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
+                            });
+                        </script>
+
+                        {% for k in range(pilot_times|length) %}
+                            <div class="lap-time">
+                                <b>Lap {{ k + 1 }}: </b> {{ format_time(pilot_times[k]) }}
+                                <button class="selected" 
+                                        onclick="toggleLapTime({{ pilot_index }}, '{{ format_time(pilot_times[k]) }}', this)">...</button>
+                            </div>
+                        {% endfor %}
+                        
+                        <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endfor %}
+</body>
+</html>
