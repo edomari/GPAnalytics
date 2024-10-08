@@ -120,13 +120,22 @@ def get_pilot_name(pilot_data):
     return pilot_name
 
 # Lista dei nomi dei piloti della MotoGP 2024
-motogp_2024_pilots = [
-    "Jorge MARTIN", "Pedro ACOSTA", "Francesco BAGNAIA", "Franco MORBIDELLI", "Marco BEZZECCHI",
-    "Maverick VIÑALES", "Fabio QUARTARARO", "Brad BINDER", "Johann ZARCO", "Raul FERNANDEZ",
-    "Takaaki NAKAGAMI", "Alex RINS", "Enea BASTIANINI", "Augusto FERNANDEZ", "Joan MIR",
-    "Marc MARQUEZ", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Lorenzo SAVADORI", "Alex MARQUEZ", "Jack MILLER", "Luca MARINI", "Aleix ESPARGARO"
+motogp_pilots_2006_2024 = [
+    "Valentino ROSSI", "Nicky HAYDEN", "Dani PEDROSA", "Casey STONER", "Loris CAPIROSSI", 
+    "Marco MELANDRI", "John HOPKINS", "Chris VERMEULEN", "Toni ELIAS", "Randy DE PUNIET", 
+    "Shinya NAKANO", "Makoto TAMADA", "Alex HOFMANN", "Kenny ROBERTS Jr.", "James ELLISON",
+    "Sylvain GUINTOLI", "Kurtis ROBERTS", "Anthony WEST", "Andrea DOVIZIOSO", "Jorge LORENZO", 
+    "James TOSELAND", "Mika KALLIO", "Niccolo CANEPA", "Gabor TALMACSI", "Aleix ESPARGARO", 
+    "Hiroshi AOYAMA", "Ben SPIES", "Marco SIMONCELLI", "Karel ABRAHAM", "Cal CRUTCHLOW", 
+    "Stefan BRADL", "Colin EDWARDS", "Toni ELIAS", "Randy DE PUNIET", "Hector BARBERA",
+    "Bradley SMITH", "Danilo PETRUCCI", "Scott REDDING", "Pol ESPARGARO", "Yonny HERNANDEZ",
+    "Marc MARQUEZ", "Michele PIRRO", "Maverick VIÑALES", "Jack MILLER", "Tito RABAT", 
+    "Franco MORBIDELLI", "Johann ZARCO", "Takaaki NAKAGAMI", "Alex RINS", "Fabio QUARTARARO", 
+    "Miguel OLIVEIRA", "Pecco BAGNAIA", "Joan MIR", "Iker LECUONA", "Luca MARINI", 
+    "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
+    "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ"
 ]
-races = ["val", "qat","mal", "tha","aus","ina","jpn","ind","rsm","cat","aut","gbr","ned","ger","ita","fra","spa","ame","arg","por"]
+
 def process_first_page_text(page_text):
     # Dividi il testo della prima pagina in righe
     lines = page_text.splitlines()
