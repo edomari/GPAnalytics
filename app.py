@@ -107,7 +107,7 @@ def process_pilots_data(text):
 
 def get_pilot_name(pilot_data):
     pilot_name = None
-    for name in motogp_2024_pilots:
+    for name in motogp_pilots:
         if name[:8] in pilot_data:
             pilot_name = name
             break
@@ -120,7 +120,7 @@ def get_pilot_name(pilot_data):
     return pilot_name
 
 # Lista dei nomi dei piloti della MotoGP 2024
-motogp_pilots_2006_2024 = [
+motogp_pilots = [
     "Valentino ROSSI", "Nicky HAYDEN", "Dani PEDROSA", "Casey STONER", "Loris CAPIROSSI", 
     "Marco MELANDRI", "John HOPKINS", "Chris VERMEULEN", "Toni ELIAS", "Randy DE PUNIET", 
     "Shinya NAKANO", "Makoto TAMADA", "Alex HOFMANN", "Kenny ROBERTS Jr.", "James ELLISON",
