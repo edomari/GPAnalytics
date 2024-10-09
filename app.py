@@ -142,7 +142,7 @@ def process_first_page_text(page_text):
     
     # Rimuovi le prime 10 righe e le ultime 9 righe dalla prima pagina
     if len(lines) > 19:
-        lines = lines[10:-7]
+        lines = lines[9:-7]
     
     # Unisci le linee e correggi i tempi
     return fix_lap_times("\n".join(lines))
