@@ -64,8 +64,7 @@ def process_pilots_data(text):
     Ogni pilota ha 5 righe di informazioni seguite da 27 giri.
     """
     # Regex per trovare l'inizio dei blocchi di ogni pilota (es. "37Red Bull GASGAS Tech3SPA Augusto FERNANDEZ14th")
-    pilot_delimiter_pattern = re.compile(r"\d{1,3}[A-Za-z\s\-]+[A-Z]{2,4}\s+[A-Za-z\s\-\u00C0-\u017F]+(?=\d{1,2}(st|nd|rd|th))", re.MULTILINE)
-
+    pilot_delimiter_pattern = re.compile(r"\d{1,3}[A-Za-z\s&\-\']+[A-Z]{2,4}\s+[A-Za-z\s\-\u00C0-\u017F]+(?=\d{1,2}(st|nd|rd|th))", re.MULTILINE)
     # Regex per delimitare la fine di un pilota, cercando "unfinished"
     end_delimiter_pattern = re.compile(r"unfinished", re.MULTILINE)
 
@@ -135,7 +134,8 @@ motogp_pilots = [
     "Miguel OLIVEIRA", "Pecco BAGNAIA", "Joan MIR", "Iker LECUONA", "Luca MARINI", 
     "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
     "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ", 
-    "Andrea IANNONE", "Alvaro BAUTISTA"
+    "Andrea IANNONE", "Alvaro BAUTISTA", "Alex DE ANGELIS", "Loris BAZ", "Eugene LAVERTY", 
+    "Claudio CORTI"
 ]
 
 def process_first_page_text(page_text):
