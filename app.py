@@ -64,7 +64,7 @@ def process_pilots_data(text):
     Ogni pilota ha 5 righe di informazioni seguite da 27 giri.
     """
     # Regex per trovare l'inizio dei blocchi di ogni pilota (es. "37Red Bull GASGAS Tech3SPA Augusto FERNANDEZ14th")
-    pilot_delimiter_pattern = re.compile(r"\d{1,3}[A-Za-z\s]+[A-Z]{3}\s+[\w\s]+[0-9]{1,2}(st|nd|rd|th)?", re.MULTILINE)
+    pilot_delimiter_pattern = re.compile(r"\d{1,3}[A-Za-z\s\-]+[A-Z]{3}\s+[A-Za-z\s\-]+(?=\d{1,2}(st|nd|rd|th))", re.MULTILINE)
     # Regex per delimitare la fine di un pilota, cercando "unfinished"
     end_delimiter_pattern = re.compile(r"unfinished", re.MULTILINE)
 
