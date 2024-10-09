@@ -133,7 +133,8 @@ motogp_pilots = [
     "Franco MORBIDELLI", "Johann ZARCO", "Takaaki NAKAGAMI", "Alex RINS", "Fabio QUARTARARO", 
     "Miguel OLIVEIRA", "Pecco BAGNAIA", "Joan MIR", "Iker LECUONA", "Luca MARINI", 
     "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
-    "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ"
+    "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ", 
+    "Andrea IANNONE", "Alvaro BAUTISTA"
 ]
 
 def process_first_page_text(page_text):
