@@ -135,7 +135,7 @@ motogp_pilots = [
     "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
     "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ", 
     "Andrea IANNONE", "Alvaro BAUTISTA", "Alex DE ANGELIS", "Loris BAZ", "Eugene LAVERTY", 
-    "Claudio CORTI"
+    "Claudio CORTI", "Troy BAYLISS"
 ]
 
 def process_first_page_text(page_text):
