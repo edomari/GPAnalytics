@@ -108,7 +108,7 @@ def process_pilots_data(text):
 def get_pilot_name(pilot_data):
     pilot_name = None
     for name in motogp_pilots:
-        if name[:9] in pilot_data:
+        if name[:6] in pilot_data:
             pilot_name = name
             break
         if name[-3:] in pilot_data:
