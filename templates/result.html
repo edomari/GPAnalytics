@@ -39,6 +39,10 @@
             text-align: center;
             font-weight: bold;
         }
+        .fastest-lap, .slowest-lap {
+            margin-top: 10px;
+            text-align: center;
+        }
         /* Stile per i pulsanti verdi e rossi */
         .selected {
             background-color: green;
@@ -48,10 +52,15 @@
             background-color: red;
             color: white;
         }
-        h1{
+        h1 {
             text-align: center;
         }
+        canvas {
+            width: 100%;
+            height: 300px;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Oggetto per tenere traccia dei tempi selezionati per ogni pilota
         let selectedLapTimes = {};
@@ -59,6 +68,8 @@
         function initializeSelectedTimes(pilotIndex, lapTimes) {
             selectedLapTimes[pilotIndex] = [...lapTimes];
             calculateAverageTime(pilotIndex);
+            drawChart(pilotIndex, lapTimes);
+            displayFastestAndSlowestLap(pilotIndex, lapTimes); // Calcola e visualizza i giri più veloce e lento
         }
 
         function toggleLapTime(pilotIndex, lapTime, buttonElement) {
@@ -77,6 +88,8 @@
                 buttonElement.classList.add('selected');
             }
             calculateAverageTime(pilotIndex);
+            drawChart(pilotIndex, selectedLapTimes[pilotIndex]);
+            displayFastestAndSlowestLap(pilotIndex, selectedLapTimes[pilotIndex]);
         }
 
         function calculateAverageTime(pilotIndex) {
@@ -103,17 +116,117 @@
             const secs = (seconds % 60).toFixed(3);
             return `${minutes}:${secs.padStart(5, '0')}`;
         }
+
+        function formatTimeWithMilliseconds(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
+            return `${minutes}:${secs.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`;
+        }
+
+        // Funzione per deselezionare il primo giro di tutti i piloti
+        function deselectFirstLap() {
+            for (const pilotIndex in selectedLapTimes) {
+                if (selectedLapTimes[pilotIndex].length > 0) {
+                    const firstLapTime = selectedLapTimes[pilotIndex][0];
+                    selectedLapTimes[pilotIndex].splice(0, 1); // Rimuovi il primo giro
+                    // Aggiorna i pulsanti per il primo giro
+                    const button = document.querySelector(`.pilot[data-pilot-index="${pilotIndex}"] .lap-time button`);
+                    if (button) {
+                        button.classList.remove('selected');
+                        button.classList.add('unselected');
+                    }
+                    calculateAverageTime(pilotIndex); // Ricalcola la media
+                    displayFastestAndSlowestLap(pilotIndex, selectedLapTimes[pilotIndex]); // Ricalcola il giro veloce e lento
+                }
+            }
+        }
+
+        function drawChart(pilotIndex, lapTimes) {
+            const ctx = document.getElementById(`chart-${pilotIndex}`).getContext('2d');
+
+            // Converte i tempi in secondi
+            const lapTimesInSeconds = lapTimes.map(time => timeToSeconds(time));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: lapTimes.map((_, index) => `Lap ${index + 1}`),
+                    datasets: [{
+                        label: 'Tempi sul giro (mm:ss:ms)',
+                        data: lapTimesInSeconds,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Giri'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Tempo (mm:ss:ms)',
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatTimeWithMilliseconds(value); // Formatta i valori sull'asse Y
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItem) {
+                                    return `Lap ${tooltipItem[0].label}`;
+                                },
+                                label: function(tooltipItem) {
+                                    return `Tempo: ${formatTimeWithMilliseconds(tooltipItem.raw)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayFastestAndSlowestLap(pilotIndex, lapTimes) {
+            const fastestLapDisplay = document.getElementById(`fastest-lap-${pilotIndex}`);
+            const slowestLapDisplay = document.getElementById(`slowest-lap-${pilotIndex}`);
+
+            if (!lapTimes || lapTimes.length === 0) {
+                fastestLapDisplay.innerText = 'Giro più veloce: N/A';
+                slowestLapDisplay.innerText = 'Giro più lento: N/A';
+                return;
+            }
+
+            const lapTimesInSeconds = lapTimes.map(time => timeToSeconds(time));
+            const fastestLapTime = Math.min(...lapTimesInSeconds);
+            const slowestLapTime = Math.max(...lapTimesInSeconds);
+
+            fastestLapDisplay.innerText = 'Giro più veloce: ' + formatTime(fastestLapTime);
+            slowestLapDisplay.innerText = 'Giro più lento: ' + formatTime(slowestLapTime);
+        }
     </script>
 </head>
 <body>
     <h1>Tempi sul giro per pilota - MotoGP 2024</h1>
+    <!-- Pulsante per deselezionare il primo giro -->
+    <button onclick="deselectFirstLap()">Deseleziona primo giro</button>
     {% for i in range(0, pilots_data|length, 3) %}
         <div class="pilots-row">
             {% for j in range(3) %}
                 {% set pilot_index = i + j %}
                 {% if pilot_index < pilots_data|length %}
                     {% set pilot_name, pilot_times = pilots_data[pilot_index] %}
-                    <div class="pilot">
+                    <div class="pilot" data-pilot-index="{{ pilot_index }}">
                         <h2>{{ pilot_name }} - {{ pilot_index + 1 }}&deg</h2>
 
                         <script>
@@ -132,6 +245,10 @@
                         {% endfor %}
                         
                         <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
+                        <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Giro più veloce: Non selezionato</div>
+                        <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Giro più lento: Non selezionato</div>
+                        <!-- Aggiunta del grafico -->
+                        <canvas id="chart-{{ pilot_index }}"></canvas>
                     </div>
                 {% endif %}
             {% endfor %}

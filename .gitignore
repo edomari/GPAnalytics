@@ -1,1 +1,6 @@
 .vercel
+.env
+__pycache__
+pyvenv.cfg
+ValenciaTest.pdf
+app copy.py

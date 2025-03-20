@@ -3,52 +3,63 @@ import PyPDF2
 import requests
 from io import BytesIO
 import re
-
+import sys
+from pilots import motogp_pilots
 app = Flask(__name__)
+
 def fix_lap_times(text):
     """
     Corregge i tempi dei giri nel formato x'xx.xxx o gestisce il caso 'unfinished'.
+    Separa i tempi concatenati nella stessa riga.
     """
-    # Regex per trovare i tempi sul giro, es. 1'31.117 o la stringa "unfinished"
-    lap_time_pattern = re.compile(r"(\d'\d{2}\.\d{3}|unfinished)")
-    
-    # Aggiungi una nuova riga prima di ogni tempo che appare dopo il primo nella stessa riga
-    fixed_text = lap_time_pattern.sub(lambda x: '\n' + x.group(0), text)
-    
-    # Rimuovi le righe vuote
+    # Regex per trovare i tempi dei giri (es. 1'34.1862 o 1'33.8893)
+    lap_time_pattern = re.compile(r"(\d{1,2})'(\d{2}\.\d{3})\s+(\d+)\s+(\d+\.\d{3})\s+(\d+\.\d{3})\s+(\d+\.\d{3})\s+(\d+\.\d{1})\s+(\d+\.\d{3})")
+
+    # Trova tutte le occorrenze di tempi concatenati
+
+    # Lista per memorizzare le righe corrette
+    fixed_lines = []
+
+    # Itera attraverso le righe del testo
+    for line in text.splitlines():
+        # Se la riga contiene un tempo concatenato, separiamolo
+        if lap_time_pattern.search(line):
+            # Sostituisci ogni tempo concatenato con una nuova riga
+            fixed_line = lap_time_pattern.sub(lambda x: '\n' + x.group(0), line)
+            fixed_lines.append(fixed_line.strip())
+        else:
+            fixed_lines.append(line.strip())
+
+    # Unisci le righe corrette in un unico testo
+    fixed_text = "\n".join(fixed_lines)
+
+    # Rimuovi righe vuote
     fixed_text = "\n".join([line for line in fixed_text.splitlines() if line.strip() != ""])
-    
+
     return fixed_text
 
 def convert_lap_times_seconds(text):
     """
-    Estrae tutti i tempi validi (nel formato x'xx.xxx) e li converte in secondi.
+    Estrae tutti i tempi sul giro validi (nel formato x'xx.xxx all'inizio della riga) e li converte in secondi.
     Ignora i giri contrassegnati come 'unfinished'.
     """
-    # Regex per trovare tutti i tempi nel formato x'xx.xxx
-    lap_time_pattern = re.compile(r"(\d)'(\d{2})\.(\d{3})")
+    # Regex per trovare tempi sul giro validi all'inizio della riga (x'xx.xxx)
+    lap_time_pattern = re.compile(r"^(\d+)'(\d{2})\.(\d{3})", re.MULTILINE)
     
     lap_times_in_seconds = []
     
-    # Trova tutti i tempi nel testo
+    # Trova e converte i tempi sul giro
     for match in lap_time_pattern.finditer(text):
+        # Estrai minuti, secondi e millisecondi dal tempo sul giro
         minutes = int(match.group(1))
         seconds = int(match.group(2))
         milliseconds = int(match.group(3))
         
-        # Converti il tempo in secondi
+        # Converti il tempo sul giro in secondi
         total_seconds = minutes * 60 + seconds + milliseconds / 1000.0
         lap_times_in_seconds.append(total_seconds)
     
     return lap_times_in_seconds
-
-def calculate_average_lap_time(lap_times):
-    """
-    Calcola la media dei tempi sul giro dati in secondi.
-    """
-    if len(lap_times) == 0:
-        return None  # Nessun tempo valido disponibile
-    return sum(lap_times) / len(lap_times)
 
 def format_time(seconds):
     """
@@ -61,10 +72,16 @@ def format_time(seconds):
 def process_pilots_data(text):
     """
     Processa il testo estratto dal PDF e immagazzina i dati di ogni pilota in un vettore.
-    Ogni pilota ha 5 righe di informazioni seguite da 27 giri.
     """
     # Regex per trovare l'inizio dei blocchi di ogni pilota (es. "37Red Bull GASGAS Tech3SPA Augusto FERNANDEZ14th")
-    pilot_delimiter_pattern = re.compile(r"\d{1,3}[A-Za-z\s&\-\']+[A-Z]{2,4}\s+[A-Za-z\s\-\u00C0-\u017F]+(?=\d{1,2}(st|nd|rd|th))", re.MULTILINE)
+    pilot_delimiter_pattern = re.compile(
+        r"(\d{1,3})\s*"  # Numero del pilota (1-3 cifre)
+        r"([A-Za-z\s&\.'-]+)\s*"  # Nome del team
+        r"([A-Z]{2,4})\s*"  # Nazionalità del team
+        r"([A-Za-z\s&\.'-Ññ]+)\s*"  # Nome del pilota (inclusi caratteri speciali come Ñ)
+        r"(\d{1,2}(?:st|nd|rd|th))",  # Posizione
+        re.MULTILINE
+    )
     # Regex per delimitare la fine di un pilota, cercando "unfinished"
     end_delimiter_pattern = re.compile(r"unfinished", re.MULTILINE)
 
@@ -96,47 +113,33 @@ def process_pilots_data(text):
         # Correggi i tempi del pilota
         fixed_pilot_data = fix_lap_times(pilot_block.strip())
         
+        #print(fixed_pilot_data, file=sys.stderr)
+        #print("\n")
         # Estrai i tempi validi e calcola la media
         lap_times = convert_lap_times_seconds(fixed_pilot_data)
         pilot_name = get_pilot_name(fixed_pilot_data)
 
         # Salva i dati del pilota e la sua media dei tempi
         pilots_data.append((pilot_name, lap_times))
+    
+    print(pilots_data)
 
     return pilots_data  
 
 def get_pilot_name(pilot_data):
     pilot_name = None
     for name in motogp_pilots:
-        if name[:5] in pilot_data:
+        if name.replace(" ", "") in "".join(pilot_data.partition('\n')[0].split()):
             pilot_name = name
             break
-        if name[-3:] in pilot_data:
-            pilot_name = name
-
+        else:
+            continue
+        
+    # "".join(pilot_data.partition('\n')[0].split())
     if not pilot_name:
         pilot_name = "Nome non trovato"
 
     return pilot_name
-
-# Lista dei nomi dei piloti della MotoGP 2024
-motogp_pilots = [
-    "Valentino ROSSI", "Nicky HAYDEN", "Dani PEDROSA", "Casey STONER", "Loris CAPIROSSI", 
-    "Marco MELANDRI", "John HOPKINS", "Chris VERMEULEN", "Toni ELIAS", "Randy DE PUNIET", 
-    "Shinya NAKANO", "Makoto TAMADA", "Alex HOFMANN", "Kenny ROBERTS Jr.", "James ELLISON",
-    "Sylvain GUINTOLI", "Kurtis ROBERTS", "Anthony WEST", "Andrea DOVIZIOSO", "Jorge LORENZO", 
-    "James TOSELAND", "Mika KALLIO", "Niccolo CANEPA", "Gabor TALMACSI", "Aleix ESPARGARO", 
-    "Hiroshi AOYAMA", "Ben SPIES", "Marco SIMONCELLI", "Karel ABRAHAM", "Cal CRUTCHLOW", 
-    "Stefan BRADL", "Colin EDWARDS", "Toni ELIAS", "Randy DE PUNIET", "Hector BARBERA",
-    "Bradley SMITH", "Danilo PETRUCCI", "Scott REDDING", "Pol ESPARGARO", "Yonny HERNANDEZ",
-    "Marc MARQUEZ", "Michele PIRRO", "Maverick VIÑALES", "Jack MILLER", "Tito RABAT", 
-    "Franco MORBIDELLI", "Johann ZARCO", "Takaaki NAKAGAMI", "Alex RINS", "Fabio QUARTARARO", 
-    "Miguel OLIVEIRA", "Pecco BAGNAIA", "Joan MIR", "Iker LECUONA", "Luca MARINI", 
-    "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
-    "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ", 
-    "Andrea IANNONE", "Alvaro BAUTISTA", "Alex DE ANGELIS", "Loris BAZ", "Eugene LAVERTY", 
-    "Claudio CORTI", "Troy BAYLISS"
-]
 
 def process_first_page_text(page_text):
     # Dividi il testo della prima pagina in righe
@@ -144,7 +147,7 @@ def process_first_page_text(page_text):
     
     # Rimuovi le prime 10 righe e le ultime 9 righe dalla prima pagina
     if len(lines) > 19:
-        lines = lines[9:-7]
+        lines = lines[8:-7]
     
     # Unisci le linee e correggi i tempi
     return fix_lap_times("\n".join(lines))
@@ -186,8 +189,6 @@ def result():
         else:
             pdf_url = new_url
     
-    # Scarica il PDF
-
     pdf_data = BytesIO(response.content)
 
     # Usa PyPDF2 per estrarre il testo
@@ -196,18 +197,18 @@ def result():
     for page_num in range(len(reader.pages)):
         page = reader.pages[page_num]
         page_text = page.extract_text()
-            
+  
         # Applica la rimozione delle righe solo alla prima pagina
         if page_num == 0:
             filtered_text = process_first_page_text(page_text)
         else:
             # Rimuovi le prime 2 righe e le ultime 9 righe per tutte le altre pagine
             filtered_text = process_other_pages_text(page_text)
-                
         text += filtered_text + "\n"  # Aggiungi il testo (modificato o no)
-    
+
     # Processa i dati dei piloti
     pilots_data = process_pilots_data(text)
+
 
     # Stampa i dati dei piloti
     # Rendi la pagina con il testo estratto e i dati dei piloti
