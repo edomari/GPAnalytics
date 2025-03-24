@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seleziona Gran Premio - MotoGP</title>
+    <title>MotoGPStats</title>
     <style>
+
         @font-face {
             font-family: 'MioFont';
             src: url('/static/fonts/MotoGPText-Regular.ttf') format('truetype');
@@ -13,74 +14,74 @@
         }
 
         body {
-            font-family: 'MioFont'; /* Aggiunto sans-serif come fallback */
+            font-family: 'MioFont'; 
         }
 
-/* CSS */
-.button-54 {
-  font-family: "Open Sans", sans-serif;
-  font-size: 16px;
-  letter-spacing: 2px;
-  text-decoration: none;
-  text-transform: uppercase;
-  color: #000;
-  cursor: pointer;
-  border: 3px solid;
-  padding: 0.25em 0.5em;
-  box-shadow: 1px 1px 0px 0px, 2px 2px 0px 0px, 3px 3px 0px 0px, 4px 4px 0px 0px, 5px 5px 0px 0px;
-  position: relative;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-  background-color: white;
-}
+        .button-54 {
+            font-family: "Open Sans", sans-serif;
+            font-size: 16px;
+            letter-spacing: 2px;
+            text-decoration: none;
+            text-transform: uppercase;
+            color: #000;
+            cursor: pointer;
+            border: 3px solid;
+            padding: 0.25em 0.5em;
+            box-shadow: 1px 1px 0px 0px, 2px 2px 0px 0px, 3px 3px 0px 0px, 4px 4px 0px 0px, 5px 5px 0px 0px;
+            position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: white;
+        }
 
-.button-54:active {
-  box-shadow: 0px 0px 0px 0px;
-  top: 5px;
-  left: 5px;
-}
+        .button-54:active {
+            box-shadow: 0px 0px 0px 0px;
+            top: 5px;
+            left: 5px;
+        }
 
-@media (min-width: 768px) {
-  .button-54 {
-    padding: 0.25em 0.75em;
-  }
-}
+        @media (min-width: 768px) {
+            .button-54 {
+                padding: 0.25em 0.75em;
+            }
+        }
+
     </style>
 </head>
 <body>
-    <h1>Seleziona l'anno e il Gran Premio</h1>
-    <form action="/results" method="GET">
-        <!-- Selezione anno -->
-        <label for="anno">Anno:</label>
-        <select id="anno" name="anno">
-            {% for year in range(2006, 2025) %}
+    <h1>Select year and gran prix</h1>
+    <form action="/results" method="POST">
+        <label for="year">Year:</label>
+        <select id="year" name="year">
+            {% for year in range(2018, 2026) %}
                 <option value="{{ year }}">{{ year }}</option>
             {% endfor %}
         </select>
 
-        <label for="granPremio">Gran Premio:</label>
-        <select id="granPremio" name="granPremio">
+        <label for="granPrix">Gran Prix:</label>
+        <select id="granPrix" name="granPrix">
+            <option value="sol">Solidarity</option>
             <option value="val">Valencia</option>
             <option value="qat">Qatar</option>
             <option value="mal">Malesia</option>
             <option value="tha">Thailandia</option>
             <option value="aus">Australia</option>
             <option value="ina">Indonesia</option>
-            <option value="jpn">Giappone</option>
+            <option value="jpn">Japan</option>
             <option value="ind">India</option>
             <option value="rsm">San Marino</option>
             <option value="cat">Catalogna</option>
             <option value="aut">Austria</option>
-            <option value="gbr">Gran Bretagna</option>
-            <option value="ned">Paesi Bassi</option>
-            <option value="ger">Germania</option>
-            <option value="ita">Italia</option>
-            <option value="fra">Francia</option>
-            <option value="spa">Spagna</option>
-            <option value="ame">Americhe</option>
+            <option value="gbr">Great Britain</option>
+            <option value="ned">Netherland</option>
+            <option value="ger">Germany</option>
+            <option value="ita">Italy</option>
+            <option value="fra">France</option>
+            <option value="spa">Spain</option>
+            <option value="ame">America</option>
             <option value="arg">Argentina</option>
-            <option value="por">Portogallo</option>
+            <option value="por">Portugal</option>
         </select>
 
         <button class="button-54" role="button" type="submit">Vai al PDF</button>

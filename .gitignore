@@ -4,4 +4,5 @@ __pycache__
 pyvenv.cfg
 ValenciaTest.pdf
 app copy.py
-.gitignore
+test.py
+out.txt

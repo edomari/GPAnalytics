@@ -13,9 +13,10 @@ motogp_pilots = [
     "Miguel OLIVEIRA", "Francesco BAGNAIA", "Joan MIR", "Iker LECUONA", "Luca MARINI", 
     "Brad BINDER", "Fabio DI GIANNANTONIO", "Remy GARDNER", "Augusto FERNANDEZ", "Jorge MARTIN", 
     "Raul FERNANDEZ", "Pedro ACOSTA", "Marco BEZZECCHI", "Enea BASTIANINI", "Lorenzo SAVADORI", "Alex MARQUEZ", 
-    "Andrea IANNONE", "Alvaro BAUTISTA", "Alex DE ANGELIS", "Loris BAZ", "Eugene LAVERTY", 
+    "Andrea IyearNE", "Alvaro BAUTISTA", "Alex DE ANGELIS", "Loris BAZ", "Eugene LAVERTY", 
     "Claudio CORTI", "Troy BAYLISS", "Carlos CHECA", "Fabio DI GIANNANTONI", "Fabio DI GIANNANTON",
     "Darryn BINDER", "Kazuki WATANABE", "Hafizh SYAHRIN", "Broc PARKES", "Mike DI MEGLIO", "Yonny HERNANDE", "Michael LAVERTY",
     "Damian CUDLIN", "Lukas PESEK", "Martin BAUER", "Luca SCASSA", "Bryan STARING", "Katsuyuki NAKASU", "Ivan SILVA","Roberto ROLFO",
-    "Josh HAYES", "Alex BARROS", "Fermin ALDEGUER", "Somkiat CHANTRA"
+    "Josh HAYES", "Alex BARROS", "Fermin ALDEGUER", "Somkiat CHANTRA", "Xavier SIMEON", "Jordi TORRES",
+    "Thomas LUTHI", "Jack MILLER", "Bradle SMITH"
 ]
