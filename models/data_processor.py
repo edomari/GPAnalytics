@@ -1,5 +1,5 @@
 import re
-from pilots import motogp_pilots
+from utils.pilots import motogp_pilots
 
 class Analyzer:
     @staticmethod
@@ -36,13 +36,13 @@ class Analyzer:
         :return: Dizionario con tempo giro, settori e velocità massima
         """
         pattern = re.compile(
-            r"(\d{1,2})'(\d{2}\.\d{3})"  # Gruppo 1: minuti, Gruppo 2: secondi.millisecondi (tempo giro)
-            r"\s+\d+"                    # Posizione (ignorata)
-            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 1 (minuti o secondi)
-            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 2 (minuti o secondi)
-            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 3 (minuti o secondi)
+            r"(\d{1,2})'(\d{2}\.\d{3})"  # Gruppo 1: minuti, Gruppo 2: secondi.millisecondi 
+            r"\s+\d+"                    # Posizione 
+            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 1 
+            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 2 
+            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})"  # Settore 3 
             r"\s+\d+\.\d{1,3}"           # Velocità max
-            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})",  # Settore 4 (minuti o secondi)
+            r"\s+(\d{1,2}'(?:\d{2}\.\d{3})|\d+\.\d{3})",  # Settore 4
             re.MULTILINE
         )
 

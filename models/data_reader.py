@@ -2,7 +2,7 @@ import re
 import PyPDF2
 import requests
 from io import BytesIO
-from data_processor import Analyzer
+from models.data_processor import Analyzer
 import logging
 
 logging.basicConfig(level=logging.INFO)

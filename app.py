@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template, request
-from data_processor import Analyzer
-from data_reader import Converting
+from models.data_processor import Analyzer
+from models.data_reader import Converting
 app = Flask(__name__) 
 
 @app.route('/')

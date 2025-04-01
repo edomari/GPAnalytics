@@ -1,8 +1,7 @@
 .vercel
 .env
 __pycache__
-pyvenv.cfg
-ValenciaTest.pdf
 app copy.py
 test.py
 out.txt
+.DS_Store
