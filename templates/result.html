@@ -32,7 +32,7 @@
                             <div class="lap-time">
                                 <b>Lap {{ k + 1 }}: </b> {{ format_time(pilot_times[k]) }}
                                 <button class="selected" 
-                                        onclick="toggleLapTime({{ pilot_index }}, '{{ format_time(pilot_times[k]) }}', this)">...</button>
+                                        onclick="toggleLapTime({{ pilot_index }}, '{{ format_time(pilot_times[k]) }}', this)"> </button>
                             </div>
                         {% endfor %}
                         
