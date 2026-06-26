@@ -1,7 +1,7 @@
 import logging
 from io import BytesIO
 
-import PyPDF2
+from pypdf import PdfReader
 import re
 import regex
 
@@ -78,7 +78,7 @@ def get_riders_info(year, gp_name, category):
     if pdf_data is None:
         return []
 
-    text = PyPDF2.PdfReader(pdf_data).pages[0].extract_text()
+    text = PdfReader(pdf_data).pages[0].extract_text()
 
     all_riders = []
     for line in text.split('\n'):
