@@ -24,4 +24,6 @@ def result():
     )
 
 if __name__ == '__main__':
+    for i in range(2002, 2027):
+        print(Analyzer.get_all_tracks_per_year(int(i)))
     app.run()

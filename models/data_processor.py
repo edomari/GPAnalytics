@@ -1,5 +1,10 @@
 import re
+from io import BytesIO
+
+import logger
+import requests
 from pypdf import PdfReader
+import logging
 
 from utils.http_client import download_first_available_pdf
 from utils.riders import get_riders_info
@@ -7,7 +12,9 @@ from utils.riders import get_riders_info
 # Frammento regex per riconoscere un tempo giro (es. 1'34.186) o un tempo parziale
 LAP_TIME = r"\d{1,2}'\d{2}\.\d{3}"
 SECTOR_TIME = rf"(?:{LAP_TIME}|\d+\.\d{{3}})"
+BASE_URL = "https://resources.motogp.com/files/results"
 
+logger = logging.getLogger(__name__)
 
 class Analyzer:
     @staticmethod
@@ -15,10 +22,9 @@ class Analyzer:
         """
         Scarica il PDF di analisi della gara in formato BytesIO.
         """
-        base_url = "https://resources.motogp.com/files/results"
         urls = [
-            f"{base_url}/{year}/{gp_name}/MotoGP/RAC/Analysis.pdf",
-            f"{base_url}/{year}/MotoGP/{gp_name}/RAC/analysis.pdf",
+            f"{BASE_URL}/{year}/{gp_name}/MotoGP/RAC/Analysis.pdf",
+            f"{BASE_URL}/{year}/MotoGP/{gp_name}/RAC/analysis.pdf",
         ]
         return download_first_available_pdf(urls)
 
@@ -107,3 +113,23 @@ class Analyzer:
                 pilots_data.append((name, lap_times))
 
         return pilots_data
+
+    @staticmethod
+    def get_all_tracks_per_year(year):
+        url = f"{BASE_URL}/{year}/SPA/MotoGP/RAC/worldstanding.pdf"
+
+        response = requests.get(url)
+        if response.status_code != 200:
+            logger.warning(f"Impossible to download PDF from: {url}")
+            return []
+
+        logger.info(f"PDF downloaded from: {url}")
+
+        text = PdfReader(BytesIO(response.content)).pages[0].extract_text()
+
+        blocks = re.findall(
+            r"(?:\b[A-Z][A-Z0-9]{2}\b(?:\s+|$)){2,}",
+            text
+        )
+
+        return max(blocks, key=len).split()
