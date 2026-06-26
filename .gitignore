@@ -7,3 +7,4 @@ test.py
 out.txt
 .DS_Store
 venv
+.idea
