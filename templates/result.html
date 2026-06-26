@@ -10,8 +10,6 @@
 <body>
     <script src="/static/js/script.js"></script>
     <h1>Tempi sul giro per pilota - {{ granPrix }} {{ year }}</h1>
-    <!-- Pulsante per deselezionare il primo giro -->
-    <!--<button onclick="deselectFirstLap()">Deselect first</button> -->
     {% for i in range(0, pilots_data|length, 3) %}
         <div class="pilots-row">
             {% for j in range(3) %}
@@ -24,22 +22,21 @@
                         <script>
                             // Inizializzare i tempi selezionati per ogni pilota
                             document.addEventListener('DOMContentLoaded', function() {
-                                initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ format_time(pilot_times[k]) }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
+                                initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ pilot_times[k] }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
                             });
                         </script>
 
                         {% for k in range(pilot_times|length) %}
                             <div class="lap-time">
-                                <b>Lap {{ k + 1 }}: </b> {{ format_time(pilot_times[k]) }}
-                                <button class="selected" 
-                                        onclick="toggleLapTime({{ pilot_index }}, '{{ format_time(pilot_times[k]) }}', this)">...</button>
+                                <b>Lap {{ k + 1 }}: </b> {{ pilot_times[k] }}
+                                <button class="selected"
+                                        onclick="toggleLapTime({{ pilot_index }}, '{{ pilot_times[k] }}', this)">...</button>
                             </div>
                         {% endfor %}
-                        
+
                         <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
                         <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Giro più veloce: Non selezionato</div>
                         <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Giro più lento: Non selezionato</div>
-                        <!-- Aggiunta del grafico -->
                         <canvas id="chart-{{ pilot_index }}"></canvas>
                     </div>
                 {% endif %}

@@ -1,7 +1,9 @@
 .vercel
 .env
+.venv
 __pycache__
 app copy.py
 test.py
 out.txt
 .DS_Store
+venv

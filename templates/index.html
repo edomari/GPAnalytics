@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>MotoGP Lap Times</title>
+</head>
+<body>
+
+<h1>Lap Times</h1>
+
+{% for pilot, data in pilots.items() %}
+    <h2>{{ pilot }} ({{ data.nationality }})</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Giro</th>
+                <th>Tempo giro</th>
+                <th>Settore 1</th>
+                <th>Settore 2</th>
+                <th>Settore 3</th>
+                <th>Settore 4</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for lap in data.laps %}
+            <tr>
+                <td>{{ lap.lap }}</td>
+                <td>{{ lap.lap_time }}</td>
+                <td>{{ lap.s1 }}</td>
+                <td>{{ lap.s2 }}</td>
+                <td>{{ lap.s3 }}</td>
+                <td>{{ lap.s4 }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endfor %}
+
+</body>
+</html>
