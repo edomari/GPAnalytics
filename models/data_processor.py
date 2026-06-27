@@ -18,23 +18,23 @@ logger = logging.getLogger(__name__)
 
 class Analyzer:
     @staticmethod
-    def get_pdf_data(year, gp_name):
+    def get_pdf_data(year, gp_name, sessionType):
         """
         Scarica il PDF di analisi della gara in formato BytesIO.
         """
         urls = [
-            f"{BASE_URL}/{year}/{gp_name}/MotoGP/RAC/Analysis.pdf",
-            f"{BASE_URL}/{year}/MotoGP/{gp_name}/RAC/analysis.pdf",
+            f"{BASE_URL}/{year}/{gp_name}/MotoGP/{sessionType}/Analysis.pdf",
+            f"{BASE_URL}/{year}/MotoGP/{gp_name}/{sessionType}/analysis.pdf",
         ]
         return download_first_available_pdf(urls)
 
     @staticmethod
-    def extract_all_text(year, granprix):
+    def extract_all_text(year, granprix, sessionType):
         """
         Estrae tutto il testo grezzo dal PDF, pulendolo da piè di pagina
         e righe del 'Fastest Lap' che interferiscono con l'estrazione.
         """
-        pdf_data = Analyzer.get_pdf_data(year, granprix)
+        pdf_data = Analyzer.get_pdf_data(year, granprix, sessionType)
         if not pdf_data:
             return ""
 
@@ -77,12 +77,12 @@ class Analyzer:
         return lap_times
 
     @staticmethod
-    def process_pilots_data(year, granprix):
+    def process_pilots_data(year, granprix, sessionType):
         """
         Trova i blocchi di testo per ogni pilota usando i nomi estratti dall'entry list
         come delimitatori, ed estrae i relativi tempi sul giro tramite Regex tolleranti.
         """
-        text = Analyzer.extract_all_text(year, granprix)
+        text = Analyzer.extract_all_text(year, granprix, sessionType)
         print(text)
         if not text:
             return []

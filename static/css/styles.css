@@ -207,14 +207,8 @@ canvas {
 /* Selettori anno / circuito */
 .field-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 1rem;
-}
-
-@media (max-width: 540px) {
-    .field-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .field {
@@ -404,6 +398,29 @@ canvas {
     font-size: 0.75rem;
     color: var(--flag-yellow);
     margin: 0.6rem 0 0;
+}
+
+.session-badge {
+    display: inline-block;
+    width: fit-content;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.65rem;
+    border-radius: 3px;
+    margin: 0.3rem 0 0.2rem;
+}
+
+.session-badge.race {
+    background: var(--race-red);
+    color: var(--paper);
+}
+
+.session-badge.sprint {
+    background: var(--flag-yellow);
+    color: #1a1a1a;
 }
 
 .results-title {

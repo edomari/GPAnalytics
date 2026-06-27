@@ -18,6 +18,9 @@
     <header class="results-header">
         <a href="/" class="back-link">&larr; Cambia gara</a>
         <p class="results-eyebrow">MotoGPStats // Cronometraggio</p>
+        <span class="session-badge {{ 'sprint' if sessionType == 'SPR' else 'race' }}">
+            {{ 'Sprint Race' if sessionType == 'SPR' else 'Race' }}
+        </span>
         <h1 class="results-title">{{ granPrix }} <span>{{ year }}</span></h1>
         <p class="results-sub">Tocca un giro per includerlo o escluderlo dal passo gara</p>
 
@@ -27,6 +30,7 @@
     </header>
 
     <main class="grid-stage">
+        {% set pilots_data = process_pilots_data(year, granPrix, sessionType) %}
         {% for i in range(0, pilots_data|length, 3) %}
             <div class="pilots-row">
                 {% for j in range(3) %}

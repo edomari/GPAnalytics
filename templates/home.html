@@ -26,7 +26,7 @@
                 <span class="light" data-light="5"></span>
             </div>
 
-            <div class="field-grid">
+            <div class="field-grid" id="fieldGrid">
                 <div class="field">
                     <label for="year">Anno</label>
                     <select id="year" name="year" required>
@@ -34,6 +34,15 @@
                         {% for year in range(2002, 2027) %}
                             <option value="{{ year }}">{{ year }}</option>
                         {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field" id="categoryField" style="display:none">
+                    <label for="sessionType">Sessione</label>
+                    <select id="sessionType" name="sessionType">
+                        <option value="" disabled selected>Seleziona...</option>
+                        <option value="RAC">Gara (RAC)</option>
+                        <option value="SPR">Sprint (SPR)</option>
                     </select>
                 </div>
 
@@ -57,18 +66,35 @@
         const submitBtn = document.getElementById('submitBtn');
         const yearSelect = document.getElementById('year');
         const gpSelect = document.getElementById('granPrix');
+        const categoryField = document.getElementById('categoryField');
+        const sessionSelect = document.getElementById('sessionType');
         const form = document.getElementById('raceForm');
+
+        const FIRST_SPRINT_YEAR = 2023;
 
         function setLight(index, on) {
             if (lights[index]) lights[index].classList.toggle('on', on);
         }
 
+        // Mostra il campo "Sessione" (RAC/SPR) solo per gli anni in cui esiste la Sprint Race
+        function setCategoryVisible(visible) {
+            categoryField.style.display = visible ? '' : 'none';
+            sessionSelect.disabled = !visible;
+            sessionSelect.required = visible;
+            if (!visible) {
+                sessionSelect.value = '';
+            }
+        }
+
         function updateLights() {
             const yearReady = !!yearSelect.value;
-            const gpReady = yearReady && !!gpSelect.value && !gpSelect.disabled;
+            const categoryVisible = categoryField.style.display !== 'none';
+            const categoryReady = !categoryVisible || !!sessionSelect.value;
+            const trackReady = !!gpSelect.value && !gpSelect.disabled;
+            const gpReady = yearReady && categoryReady && trackReady;
 
             setLight(0, yearReady);
-            setLight(1, gpReady);
+            setLight(1, yearReady && categoryReady);
             setLight(2, gpReady);
             setLight(3, gpReady);
             setLight(4, gpReady);
@@ -78,6 +104,8 @@
 
         yearSelect.addEventListener('change', async function() {
             const year = this.value;
+
+            setCategoryVisible(year !== '' && parseInt(year, 10) >= FIRST_SPRINT_YEAR);
 
             gpSelect.innerHTML = '<option value="">Caricamento tracciati in corso...</option>';
             gpSelect.disabled = true;
@@ -117,6 +145,7 @@
             updateLights();
         });
 
+        sessionSelect.addEventListener('change', updateLights);
         gpSelect.addEventListener('change', updateLights);
 
         form.addEventListener('submit', function(event) {

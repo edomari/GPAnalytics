@@ -21,16 +21,18 @@ def get_tracks(year):
 def result():
     data = request.form
     year = int(data.get('year'))
-    granprix = data.get('granPrix').upper()
+    granPrix = data.get('granPrix').upper()
+    sessionType = data.get('sessionType', 'RAC').upper()
 
-    if not year or not granprix:
+    if not year or not granPrix or not sessionType:
         return jsonify({"success": False, "message": "Parametro/i mancante/i"}), 400
 
     return render_template(
         'result.html',
-        pilots_data=Analyzer.process_pilots_data(year, granprix),
+        process_pilots_data=Analyzer.process_pilots_data,
         year=year,
-        granPrix=granprix
+        granPrix=granPrix,
+        sessionType=sessionType
     )
 
 if __name__ == '__main__':
