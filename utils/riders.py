@@ -101,7 +101,7 @@ def _pattern_for_year(year):
             r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s*'  # 4. Cognome (Tutto maiuscolo)
             r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s*'  # 5. Nome
             r'\([A-Za-zÀ-ÿ]{3,}\)\s*'  # Nickname tra parentesi (es. (Dov)) - Non catturato
-            r'([A-Z]{3})'  # 6. Nazionalità
+            r'([A-Z]{3,4})'  # 6. Nazionalità
         )
 
     # Regex per anni > 2019 (Include fix per costruttore e cognome uniti)
@@ -112,7 +112,7 @@ def _pattern_for_year(year):
         r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # cognome
         r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # nome
         r'\([A-Za-zÀ-ÿ]+\)\s+'  # nickname
-        r'([A-Z]{3})\s+'  # nazionalità
+        r'([A-Z]{3,4})'  # nazionalità
         r'(.+)$'  # team
     )
 

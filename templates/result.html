@@ -4,44 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MotoGPStats</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
+<body class="results">
     <script src="/static/js/script.js"></script>
-    <h1>Tempi sul giro per pilota - {{ granPrix }} {{ year }}</h1>
-    {% for i in range(0, pilots_data|length, 3) %}
-        <div class="pilots-row">
-            {% for j in range(3) %}
-                {% set pilot_index = i + j %}
-                {% if pilot_index < pilots_data|length %}
-                    {% set pilot_name, pilot_times = pilots_data[pilot_index] %}
-                    <div class="pilot" data-pilot-index="{{ pilot_index }}">
-                        <h2>{{ pilot_name }} - {{ pilot_index + 1 }}&deg</h2>
 
-                        <script>
-                            // Inizializzare i tempi selezionati per ogni pilota
-                            document.addEventListener('DOMContentLoaded', function() {
-                                initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ pilot_times[k] }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
-                            });
-                        </script>
+    <div class="results-bg" aria-hidden="true"></div>
 
-                        {% for k in range(pilot_times|length) %}
-                            <div class="lap-time">
-                                <b>Lap {{ k + 1 }}: </b> {{ pilot_times[k] }}
-                                <button class="selected"
-                                        onclick="toggleLapTime({{ pilot_index }}, '{{ pilot_times[k] }}', this)">...</button>
+    <header class="results-header">
+        <a href="/" class="back-link">&larr; Cambia gara</a>
+        <p class="results-eyebrow">MotoGPStats // Cronometraggio</p>
+        <h1 class="results-title">{{ granPrix }} <span>{{ year }}</span></h1>
+        <p class="results-sub">Tocca un giro per includerlo o escluderlo dal passo gara</p>
+
+        <button type="button" class="global-action-btn" aria-pressed="false" onclick="toggleAllFirstLaps(this)">
+            Escludi il giro 1 per tutti i piloti
+        </button>
+    </header>
+
+    <main class="grid-stage">
+        {% for i in range(0, pilots_data|length, 3) %}
+            <div class="pilots-row">
+                {% for j in range(3) %}
+                    {% set pilot_index = i + j %}
+                    {% if pilot_index < pilots_data|length %}
+                        {% set pilot_name, pilot_times = pilots_data[pilot_index] %}
+                        <div class="pilot" data-pilot-index="{{ pilot_index }}">
+
+                            <div class="pilot-head">
+                                <span class="pilot-pos">P{{ pilot_index + 1 }}</span>
+                                <h2>{{ pilot_name }}</h2>
                             </div>
-                        {% endfor %}
 
-                        <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
-                        <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Giro più veloce: Non selezionato</div>
-                        <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Giro più lento: Non selezionato</div>
-                        <canvas id="chart-{{ pilot_index }}"></canvas>
-                    </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    {% endfor %}
+                            <script>
+                                // Inizializzare i tempi selezionati per ogni pilota
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ pilot_times[k] }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
+                                });
+                            </script>
+
+                            <div class="laps-list">
+                                {% for k in range(pilot_times|length) %}
+                                    <div class="lap-time" data-lap-index="{{ k }}">
+                                        <span class="lap-label">Giro {{ k + 1 }}</span>
+                                        <span class="lap-value">{{ pilot_times[k] }}</span>
+                                        <button class="selected"
+                                                aria-label="Includi o escludi il giro {{ k + 1 }} dal passo gara"
+                                                onclick="toggleLapTime({{ pilot_index }}, '{{ pilot_times[k] }}', this)">...</button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="stat-strip">
+                                <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
+                                <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Giro più veloce: Non selezionato</div>
+                                <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Giro più lento: Non selezionato</div>
+                            </div>
+
+                            <div class="chart-toggle-wrap">
+                                <button type="button"
+                                        class="chart-toggle-btn"
+                                        aria-expanded="false"
+                                        onclick="toggleChart({{ pilot_index }}, this)">Mostra grafico</button>
+                            </div>
+
+                            <div class="chart-panel" id="chart-panel-{{ pilot_index }}">
+                                <canvas id="chart-{{ pilot_index }}"></canvas>
+                                <p class="chart-note">Il primo giro è escluso dal grafico</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </main>
 </body>
 </html>

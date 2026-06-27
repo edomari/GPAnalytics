@@ -4,46 +4,100 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MotoGPStats</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body class="home">
-    <h1>Select year and gran prix</h1>
-    <form action="/results" method="POST">
-        <label for="year">Year:</label>
-        <select id="year" name="year">
-            <option value="" disabled selected>Seleziona un anno...</option>
-            {% for year in range(2002, 2027) %}
-                <option value="{{ year }}">{{ year }}</option>
-            {% endfor %}
-        </select>
+    <div class="home-bg" aria-hidden="true"></div>
 
-        <label for="granPrix">Gran Prix:</label>
-        <select id="granPrix" name="granPrix" disabled>
-            <option value="">Seleziona prima l'anno</option>
-        </select>
+    <main class="home-stage">
+        <p class="home-eyebrow">MotoGPStats // Archivio gare</p>
+        <h1 class="home-title">Seleziona<br>il tuo<br><span>Gran Premio</span></h1>
 
-        <button class="button-54" role="button" type="submit">Vai al PDF</button>
-    </form>
+        <form action="/results" method="POST" class="home-form" id="raceForm">
+
+            <div class="lights-rig" id="lightsRig" aria-hidden="true">
+                <span class="light" data-light="1"></span>
+                <span class="light" data-light="2"></span>
+                <span class="light" data-light="3"></span>
+                <span class="light" data-light="4"></span>
+                <span class="light" data-light="5"></span>
+            </div>
+
+            <div class="field-grid">
+                <div class="field">
+                    <label for="year">Anno</label>
+                    <select id="year" name="year" required>
+                        <option value="" disabled selected>--</option>
+                        {% for year in range(2002, 2027) %}
+                            <option value="{{ year }}">{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="granPrix">Circuito</label>
+                    <select id="granPrix" name="granPrix" disabled>
+                        <option value="">Seleziona prima l'anno</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="button-54 lights-out-btn" role="button" type="submit" id="submitBtn" disabled>
+                <span class="btn-default">Lights out</span>
+                <span class="btn-arrow" aria-hidden="true">&rarr;</span>
+            </button>
+        </form>
+    </main>
 
     <script>
-        document.getElementById('year').addEventListener('change', async function() {
-            const year = this.value;
-            const gpSelect = document.getElementById('granPrix');
+        const lights = document.querySelectorAll('.light');
+        const submitBtn = document.getElementById('submitBtn');
+        const yearSelect = document.getElementById('year');
+        const gpSelect = document.getElementById('granPrix');
+        const form = document.getElementById('raceForm');
 
-            // Disabilita la tendina e mostra lo stato di caricamento
+        function setLight(index, on) {
+            if (lights[index]) lights[index].classList.toggle('on', on);
+        }
+
+        function updateLights() {
+            const yearReady = !!yearSelect.value;
+            const gpReady = yearReady && !!gpSelect.value && !gpSelect.disabled;
+
+            setLight(0, yearReady);
+            setLight(1, gpReady);
+            setLight(2, gpReady);
+            setLight(3, gpReady);
+            setLight(4, gpReady);
+
+            submitBtn.disabled = !gpReady;
+        }
+
+        yearSelect.addEventListener('change', async function() {
+            const year = this.value;
+
             gpSelect.innerHTML = '<option value="">Caricamento tracciati in corso...</option>';
             gpSelect.disabled = true;
+            updateLights();
 
             try {
                 // Chiama la nuova API Flask
                 const response = await fetch(`/api/tracks/${year}`);
                 const tracks = await response.json();
 
-                // Svuota la tendina
                 gpSelect.innerHTML = '';
 
                 if (tracks && tracks.length > 0) {
-                    // Popola la tendina con i risultati estratti dal PDF
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    placeholder.textContent = "Seleziona il circuito...";
+                    gpSelect.appendChild(placeholder);
+
                     tracks.forEach(track => {
                         const option = document.createElement('option');
                         // Nel tuo backend c'è già il metodo .upper() su granPrix,
@@ -52,7 +106,6 @@
                         option.textContent = track;
                         gpSelect.appendChild(option);
                     });
-                    // Riabilita la tendina
                     gpSelect.disabled = false;
                 } else {
                     gpSelect.innerHTML = '<option value="">Nessun tracciato trovato</option>';
@@ -61,6 +114,20 @@
                 console.error("Errore nel recupero dei tracciati:", error);
                 gpSelect.innerHTML = '<option value="">Errore di caricamento</option>';
             }
+            updateLights();
+        });
+
+        gpSelect.addEventListener('change', updateLights);
+
+        form.addEventListener('submit', function(event) {
+            if (submitBtn.disabled) {
+                event.preventDefault();
+                return;
+            }
+            // Piccola animazione "lights out" alla partenza prima dell'invio
+            event.preventDefault();
+            lights.forEach(l => { l.classList.remove('on'); l.classList.add('out'); });
+            setTimeout(() => form.submit(), 350);
         });
     </script>
 </body>

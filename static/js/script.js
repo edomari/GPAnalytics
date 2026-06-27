@@ -1,10 +1,16 @@
 // Oggetto per tenere traccia dei tempi selezionati per ogni pilota
 let selectedLapTimes = {};
+// Tiene traccia del tempo del primo giro di ogni pilota (sempre escluso dal grafico)
+let firstLapTimes = {};
+// Tiene traccia di quali piloti hanno richiesto la visualizzazione del grafico
+let chartRequested = {};
+// Tiene traccia delle istanze Chart.js attive, per poterle distruggere prima di ridisegnare
+let chartInstances = {};
 
 function initializeSelectedTimes(pilotIndex, lapTimes) {
     selectedLapTimes[pilotIndex] = [...lapTimes];
+    firstLapTimes[pilotIndex] = lapTimes.length > 0 ? lapTimes[0] : null;
     calculateAverageTime(pilotIndex);
-    drawChart(pilotIndex, lapTimes);
     displayFastestAndSlowestLap(pilotIndex, lapTimes);
 }
 
@@ -24,8 +30,41 @@ function toggleLapTime(pilotIndex, lapTime, buttonElement) {
         buttonElement.classList.add('selected');
     }
     calculateAverageTime(pilotIndex);
-    drawChart(pilotIndex, selectedLapTimes[pilotIndex]);
     displayFastestAndSlowestLap(pilotIndex, selectedLapTimes[pilotIndex]);
+    // Aggiorna il grafico solo se il pilota lo ha già richiesto
+    renderChartForPilot(pilotIndex);
+}
+
+// Mostra/nasconde il grafico di un pilota; lo disegna alla prima richiesta
+function toggleChart(pilotIndex, buttonElement) {
+    const panel = document.getElementById(`chart-panel-${pilotIndex}`);
+    if (!panel) return;
+
+    const isVisible = panel.classList.contains('visible');
+
+    if (isVisible) {
+        panel.classList.remove('visible');
+        buttonElement.textContent = 'Mostra grafico';
+        buttonElement.setAttribute('aria-expanded', 'false');
+    } else {
+        panel.classList.add('visible');
+        buttonElement.textContent = 'Nascondi grafico';
+        buttonElement.setAttribute('aria-expanded', 'true');
+        chartRequested[pilotIndex] = true;
+        renderChartForPilot(pilotIndex);
+    }
+}
+
+// Disegna (o ridisegna) il grafico di un pilota, escludendo sempre il primo giro
+function renderChartForPilot(pilotIndex) {
+    if (!chartRequested[pilotIndex]) {
+        return; // Il grafico non è mai stato richiesto: non c'è nulla da disegnare
+    }
+
+    const times = (selectedLapTimes[pilotIndex] || []).filter(
+        time => time !== firstLapTimes[pilotIndex]
+    );
+    drawChart(pilotIndex, times);
 }
 
 function calculateAverageTime(pilotIndex) {
@@ -60,33 +99,66 @@ function formatTimeWithMilliseconds(seconds) {
     return `${minutes}:${secs.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`;
 }
 
-/*
-// Funzione per deselezionare il primo giro di tutti i piloti
-function deselectFirstLap() {
-    for (const pilotIndex in selectedLapTimes) {
-        if (selectedLapTimes[pilotIndex].length > 0) {
-            const firstLapTime = selectedLapTimes[pilotIndex][0];
-            selectedLapTimes[pilotIndex].splice(0, 1); // Rimuovi il primo giro
-            // Aggiorna i pulsanti per il primo giro
-            const button = document.querySelector(`.pilot[data-pilot-index="${pilotIndex}"] .lap-time button`);
+// Tiene traccia dello stato del pulsante globale "giro 1 per tutti"
+let firstLapsExcluded = false;
+
+// Interruttore globale: esclude o riabilita il giro 1 per tutti i piloti
+function toggleAllFirstLaps(buttonElement) {
+    firstLapsExcluded = !firstLapsExcluded;
+
+    Object.keys(selectedLapTimes).forEach(pilotIndexStr => {
+        const pilotIndex = Number(pilotIndexStr);
+        const firstLapTime = firstLapTimes[pilotIndex];
+        if (firstLapTime == null) return;
+
+        const button = document.querySelector(
+            `.pilot[data-pilot-index="${pilotIndex}"] .lap-time[data-lap-index="0"] button`
+        );
+        const index = selectedLapTimes[pilotIndex].indexOf(firstLapTime);
+
+        if (firstLapsExcluded) {
+            // Escludi il giro 1, se non è già escluso
+            if (index > -1) {
+                selectedLapTimes[pilotIndex].splice(index, 1);
+            }
             if (button) {
                 button.classList.remove('selected');
                 button.classList.add('unselected');
             }
-            calculateAverageTime(pilotIndex); // Ricalcola la media
-            displayFastestAndSlowestLap(pilotIndex, selectedLapTimes[pilotIndex]); // Ricalcola il giro veloce e lento
+        } else {
+            // Riabilita il giro 1, se non è già incluso
+            if (index === -1) {
+                selectedLapTimes[pilotIndex].unshift(firstLapTime);
+            }
+            if (button) {
+                button.classList.remove('unselected');
+                button.classList.add('selected');
+            }
         }
-    }
+
+        calculateAverageTime(pilotIndex);
+        displayFastestAndSlowestLap(pilotIndex, selectedLapTimes[pilotIndex]);
+        renderChartForPilot(pilotIndex);
+    });
+
+    buttonElement.textContent = firstLapsExcluded
+        ? 'Riabilita il giro 1 per tutti i piloti'
+        : 'Escludi il giro 1 per tutti i piloti';
+    buttonElement.setAttribute('aria-pressed', String(firstLapsExcluded));
 }
-*/
 
 function drawChart(pilotIndex, lapTimes) {
     const ctx = document.getElementById(`chart-${pilotIndex}`).getContext('2d');
 
+    // Distrugge l'istanza precedente, se presente, prima di ridisegnare sullo stesso canvas
+    if (chartInstances[pilotIndex]) {
+        chartInstances[pilotIndex].destroy();
+    }
+
     // Converte i tempi in secondi
     const lapTimesInSeconds = lapTimes.map(time => timeToSeconds(time));
 
-    new Chart(ctx, {
+    chartInstances[pilotIndex] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: lapTimes.map((_, index) => `Lap ${index + 1}`),
