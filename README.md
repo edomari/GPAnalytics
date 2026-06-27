@@ -7,5 +7,5 @@
 ### To-do list
 - :ballot_box_with_check: Free practices support
 - :ballot_box_with_check: Head-to-head support
-- :ballot_box_with_check: Lap counter bug fixing
-- :ballot_box_with_check: 2018 backwards support
+- :ballot_box_with_check: 2005 backwards support
+- :ballot_box_with_check: Moto3 and Moto2 Support
