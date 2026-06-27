@@ -5,6 +5,7 @@ import logger
 import requests
 from pypdf import PdfReader
 import logging
+import pycountry
 
 from utils.http_client import download_first_available_pdf
 from utils.riders import get_riders_info
@@ -32,14 +33,23 @@ class Analyzer:
     def extract_all_text(year, granprix):
         """
         Estrae tutto il testo grezzo dal PDF unendo tutte le pagine senza filtri.
-        Grazie a pypdf, il testo è già sufficientemente pulito.
+        Pulisce i piè di pagina per evitare conflitti con la ricerca dei piloti.
         """
         pdf_data = Analyzer.get_pdf_data(year, granprix)
         if not pdf_data:
             return ""
 
         reader = PdfReader(pdf_data)
-        return "\n".join(page.extract_text() for page in reader.pages)
+        text = "\n".join(page.extract_text() for page in reader.pages)
+
+        # FIX: Rimuove la riga del giro veloce a fondo pagina (che contiene nomi di piloti!)
+        text = re.sub(r"^.*Fastest Lap:.*$\n?", "", text, flags=re.MULTILINE)
+
+        # FIX (Opzionale ma consigliato): Rimuove il lunghissimo blocco di copyright
+        # che si interpone tra i giri durante i cambi di pagina
+        text = re.sub(r"These data/results cannot be reproduced.*?TISSOT\n?", "", text, flags=re.DOTALL)
+
+        return text
 
     @staticmethod
     def extract_lap_times_strings(text):
@@ -50,12 +60,12 @@ class Analyzer:
         # Il pattern cerca: TempoGiro + LapNumber + Settore1 + Settore2 + Settore3 + Velocità + Settore4
         pattern = re.compile(
             r"(\d{1,2})'(\d{2}\.\d{3})\*?"  # Gruppo 1: min, Gruppo 2: sec.ms (con opzionale * di cancellazione)
-            r"\s+\d+\*?"  # Numero del giro
+            r"\s*\d+\*?"  # Numero del giro (spazio opzionale)
             rf"\s+({SECTOR_TIME})\*?"  # Settore 1
             rf"\s+({SECTOR_TIME})\*?"  # Settore 2
             rf"\s+({SECTOR_TIME})\*?"  # Settore 3
-            r"\s+\d+\.\d{1,3}"  # Velocità max
-            rf"\s+({SECTOR_TIME})\*?",  # Settore 4
+            r"\s+\d+\.\d"  # Velocità max (FISSATA A 1 DECIMALE per evitare sovrapposizioni)
+            rf"\s*({SECTOR_TIME})\*?",  # Settore 4 (SPAZIO OPZIONALE tra velocità e settore 4)
             re.MULTILINE
         )
 
@@ -74,25 +84,39 @@ class Analyzer:
     def process_pilots_data(year, granprix):
         """
         Trova i blocchi di testo per ogni pilota usando i nomi estratti dall'entry list
-        come delimitatori, ed estrae i relativi tempi sul giro.
+        come delimitatori, ed estrae i relativi tempi sul giro tramite Regex tolleranti.
         """
         text = Analyzer.extract_all_text(year, granprix)
+        #print(text)
         if not text:
             return []
 
         # Otteniamo i piloti iscritti per quell'evento
         riders = get_riders_info(year, granprix, "MotoGP")
-
-        # Formattiamo i nomi nel modo in cui compaiono nel PDF di pypdf (es. "Alex MARQUEZ")
-        # riders: [numero, costruttore, team, cognome, nome, nazionalità]
-        pilots_names = [f"{rider[4]} {rider[3]}" for rider in riders]
-
-        # Cerchiamo l'indice (la posizione) di inizio di ogni pilota nel testo unico
+        #print(riders)
         pilot_positions = []
-        for name in pilots_names:
-            idx = text.find(name)
-            if idx != -1:
-                pilot_positions.append((idx, name))
+        for rider in riders:
+            # riders: [numero, costruttore, team, cognome, nome, nazionalità]
+            name = rider[4]
+            surname = rider[3]
+            full_name_display = f"{name} {surname}"
+
+            # Prendiamo solo i primi 8 caratteri del cognome per evitare problemi
+            # di troncamento a fine riga da parte del PDF (es. DI GIANNANTONI7th)
+            short_surname = surname[:8]
+
+            # Rendiamo sicuri i nomi per la regex (evita errori con gli apostrofi)
+            # e permettiamo spazi opzionali nel cognome (es. "DI GIANN" -> "DI\s*GIANN")
+            safe_name = re.escape(name)
+            safe_surname = re.escape(short_surname).replace(r"\ ", r"\s*")
+
+            # Pattern: cerca il nome seguito da almeno uno spazio e dai primi caratteri del cognome
+            pattern = re.compile(rf"{safe_name}\s+{safe_surname}", re.IGNORECASE)
+
+            match = pattern.search(text)
+            if match:
+                # match.start() restituisce la posizione esatta in cui inizia il nome nel testo
+                pilot_positions.append((match.start(), full_name_display))
 
         # Ordiniamo l'elenco in base a come appaiono nel documento
         pilot_positions.sort(key=lambda x: x[0])
@@ -116,20 +140,24 @@ class Analyzer:
 
     @staticmethod
     def get_all_tracks_per_year(year):
-        url = f"{BASE_URL}/{year}/SPA/MotoGP/RAC/worldstanding.pdf"
+        urls = [
+            f"{BASE_URL}/{year}/SPA/MotoGP/RAC/worldstanding.pdf",
+            f"{BASE_URL}/{year}/MotoGP/SPA/world%2bstanding.pdf",
+        ]
 
-        response = requests.get(url)
-        if response.status_code != 200:
-            logger.warning(f"Impossible to download PDF from: {url}")
-            return []
+        for url in urls:
+            response = requests.get(url)
+            if response.status_code != 200:
+                logger.warning(f"Impossible to download PDF from: {url}")
+                continue
 
-        logger.info(f"PDF downloaded from: {url}")
+            logger.info(f"PDF downloaded from: {url}")
 
-        text = PdfReader(BytesIO(response.content)).pages[0].extract_text()
+            text = PdfReader(BytesIO(response.content)).pages[0].extract_text()
 
-        blocks = re.findall(
-            r"(?:\b[A-Z][A-Z0-9]{2}\b(?:\s+|$)){2,}",
-            text
-        )
+            blocks = re.findall(
+                r"(?:\b[A-Z][A-Z0-9]{2}\b(?:\s+|$)){2,}",
+                text
+            )
 
         return max(blocks, key=len).split()

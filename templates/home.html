@@ -11,37 +11,57 @@
     <form action="/results" method="POST">
         <label for="year">Year:</label>
         <select id="year" name="year">
+            <option value="" disabled selected>Seleziona un anno...</option>
             {% for year in range(2002, 2027) %}
                 <option value="{{ year }}">{{ year }}</option>
             {% endfor %}
         </select>
 
         <label for="granPrix">Gran Prix:</label>
-        <select id="granPrix" name="granPrix">
-            <option value="sol">Solidarity</option>
-            <option value="val">Valencia</option>
-            <option value="qat">Qatar</option>
-            <option value="mal">Malesia</option>
-            <option value="tha">Thailandia</option>
-            <option value="aus">Australia</option>
-            <option value="ina">Indonesia</option>
-            <option value="jpn">Japan</option>
-            <option value="ind">India</option>
-            <option value="rsm">San Marino</option>
-            <option value="cat">Catalogna</option>
-            <option value="aut">Austria</option>
-            <option value="gbr">Great Britain</option>
-            <option value="ned">Netherland</option>
-            <option value="ger">Germany</option>
-            <option value="ita">Italy</option>
-            <option value="fra">France</option>
-            <option value="spa">Spain</option>
-            <option value="ame">America</option>
-            <option value="arg">Argentina</option>
-            <option value="por">Portugal</option>
+        <select id="granPrix" name="granPrix" disabled>
+            <option value="">Seleziona prima l'anno</option>
         </select>
 
         <button class="button-54" role="button" type="submit">Vai al PDF</button>
     </form>
+
+    <script>
+        document.getElementById('year').addEventListener('change', async function() {
+            const year = this.value;
+            const gpSelect = document.getElementById('granPrix');
+
+            // Disabilita la tendina e mostra lo stato di caricamento
+            gpSelect.innerHTML = '<option value="">Caricamento tracciati in corso...</option>';
+            gpSelect.disabled = true;
+
+            try {
+                // Chiama la nuova API Flask
+                const response = await fetch(`/api/tracks/${year}`);
+                const tracks = await response.json();
+
+                // Svuota la tendina
+                gpSelect.innerHTML = '';
+
+                if (tracks && tracks.length > 0) {
+                    // Popola la tendina con i risultati estratti dal PDF
+                    tracks.forEach(track => {
+                        const option = document.createElement('option');
+                        // Nel tuo backend c'è già il metodo .upper() su granPrix,
+                        // quindi va bene usare l'abbreviazione diretta
+                        option.value = track;
+                        option.textContent = track;
+                        gpSelect.appendChild(option);
+                    });
+                    // Riabilita la tendina
+                    gpSelect.disabled = false;
+                } else {
+                    gpSelect.innerHTML = '<option value="">Nessun tracciato trovato</option>';
+                }
+            } catch (error) {
+                console.error("Errore nel recupero dei tracciati:", error);
+                gpSelect.innerHTML = '<option value="">Errore di caricamento</option>';
+            }
+        });
+    </script>
 </body>
 </html>

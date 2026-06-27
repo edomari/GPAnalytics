@@ -9,6 +9,7 @@ from utils.http_client import download_first_available_pdf
 
 logger = logging.getLogger(__name__)
 
+
 def _pattern_for_year(year):
     """
     Restituisce la regex compilata adatta a parsare l'entry list per un dato anno:
@@ -27,31 +28,40 @@ def _pattern_for_year(year):
         return re.compile(r'^(\d+)\s+([A-Z0-9-]+(?:\s+[A-Z0-9-]+)*)\s+(.+?)\s+([A-Z]{2,}(?:\s+[A-Z]{2,})*)\s+([A-Z][A-Za-z]*(?:\s+[A-Za-z]+)*)\s+([A-Z]{3})\b')
     if year <= 2015:
         return regex.compile(
-            r'^(\d+)\s+'                                                # numero pilota
-            r'([A-Za-z0-9&]+)\s+'                                       # costruttore
+            r'^(\d+)\s+'  # numero pilota
+            r'([A-Za-z0-9&]+)\s+'  # costruttore
             r'(.+?(?:\s+(?:VDS|ECSTAR|IODA|PRAMAC|ASPAR|GRESINI))?)\s+'  # team
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'                        # cognome (Unicode maiuscole)
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'                  # nome (Unicode maiuscole+minuscole)
-            r'([A-Z]{3})(?=\s|$)'                                       # nazionalità
+            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # cognome (Unicode maiuscole)
+            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # nome (Unicode maiuscole+minuscole)
+            r'([A-Z]{3})(?=\s|$)'  # nazionalità
         )
     if year <= 2019:
+        # Regex tollerante per PDF < 2020 dove Costruttore, Team e Cognome possono essere fusi
         return regex.compile(
-            r'^(\d+)\s+'                                                                              # numero pilota
-            r'([A-Z0-9&]+)\s+'                                                                        # costruttore
-            r'(.+?(?:\s+(?:VDS|ECSTAR|IODA|PRAMAC|ASPAR|GRESINI|OCTO|CASTROL|IDEMITSU|HRC|SRT))?)\s+'  # team
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'                                                       # cognome
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'                                                 # nome
-            r'\([A-Za-zÀ-ÿ]{3}\)\s+'                                                                   # nickname tra parentesi (3 lettere)
-            r'([A-Z]{3})'                                                                              # nazionalità
+            r'^(\d+)\s+'  # numero pilota
+            r'(APRILIA|DUCATI|HONDA|KTM|SUZUKI|YAMAHA|[A-Z0-9&]+)\s*' # 1. Costruttore (cerca i noti)
+            # 2. Team (cattura tutto fino all'inizio di due o più maiuscole consecutive del cognome)
+            r'(.*?)\s*'
+            # 3. Cognome (2+ lettere maiuscole)
+            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s*'
+            # 4. Nome (Inizia con Maiuscola seguita da minuscole)
+            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s*'
+            # 5. Nickname tra parentesi (es. (Dov) o (Zar))
+            r'\([A-Za-zÀ-ÿ]{3,}\)\s*'
+            # 6. Nazionalità (3 lettere maiuscole finali)
+            r'([A-Z]{3})'
         )
+
+    # Regex per anni > 2019 (Include fix per costruttore e cognome uniti)
     return regex.compile(
-        r'^(\d+)\s+'                                # numero pilota
-        r'([A-Z0-9&]+)\s+'                          # costruttore
-        r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'        # cognome
+        r'^(\d+)\s+'  # numero pilota
+        # Costruttore (cerca prima quelli noti, poi fallback generico) con spazio opzionale \s*
+        r'(APRILIA|DUCATI|HONDA|KTM|SUZUKI|YAMAHA|GASGAS|KALEX|BOSCOSCURO|HUSQVARNA|CFMOTO|[A-Z0-9&]+)\s*'
+        r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # cognome
         r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # nome
-        r'\([A-Za-zÀ-ÿ]+\)\s+'                      # nickname
-        r'([A-Z]{3})\s+'                            # nazionalità
-        r'(.+)$'                                    # team
+        r'\([A-Za-zÀ-ÿ]+\)\s+'  # nickname
+        r'([A-Z]{3})\s+'  # nazionalità
+        r'(.+)$'  # team
     )
 
 def get_riders_info(year, gp_name, category):
@@ -79,7 +89,7 @@ def get_riders_info(year, gp_name, category):
         return []
 
     text = PdfReader(pdf_data).pages[0].extract_text()
-
+    print(text)
     all_riders = []
     for line in text.split('\n'):
         rider = pattern.match(line)

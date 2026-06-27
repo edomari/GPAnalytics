@@ -1,3 +1,4 @@
+import pycountry
 from flask import Flask, jsonify, render_template, request
 from models.data_processor import Analyzer
 
@@ -6,6 +7,15 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return render_template('home.html')
+
+@app.route('/api/tracks/<int:year>')
+def get_tracks(year):
+    try:
+        # Recupera i tracciati usando il metodo esistente
+        tracks = Analyzer.get_all_tracks_per_year(year)
+        return jsonify(tracks)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/results', methods=['POST'])
 def result():
@@ -24,6 +34,4 @@ def result():
     )
 
 if __name__ == '__main__':
-    for i in range(2002, 2027):
-        print(Analyzer.get_all_tracks_per_year(int(i)))
     app.run()
