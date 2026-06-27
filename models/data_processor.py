@@ -1,7 +1,6 @@
 import re
 from io import BytesIO
 
-import logger
 import requests
 from pypdf import PdfReader
 import logging
@@ -32,8 +31,8 @@ class Analyzer:
     @staticmethod
     def extract_all_text(year, granprix):
         """
-        Estrae tutto il testo grezzo dal PDF unendo tutte le pagine senza filtri.
-        Pulisce i piè di pagina per evitare conflitti con la ricerca dei piloti.
+        Estrae tutto il testo grezzo dal PDF, pulendolo da piè di pagina
+        e righe del 'Fastest Lap' che interferiscono con l'estrazione.
         """
         pdf_data = Analyzer.get_pdf_data(year, granprix)
         if not pdf_data:
@@ -42,42 +41,39 @@ class Analyzer:
         reader = PdfReader(pdf_data)
         text = "\n".join(page.extract_text() for page in reader.pages)
 
-        # FIX: Rimuove la riga del giro veloce a fondo pagina (che contiene nomi di piloti!)
-        text = re.sub(r"^.*Fastest Lap:.*$\n?", "", text, flags=re.MULTILINE)
+        # Rimuove righe che contengono 'Fastest Lap' (es. '1'56.528 ... Fastest Lap')
+        # Il flag MULTILINE assicura che ^ e $ si riferiscano a inizio/fine riga
+        text = re.sub(r"^.*Fastest Lap.*$", "", text, flags=re.MULTILINE)
 
-        # FIX (Opzionale ma consigliato): Rimuove il lunghissimo blocco di copyright
-        # che si interpone tra i giri durante i cambi di pagina
-        text = re.sub(r"These data/results cannot be reproduced.*?TISSOT\n?", "", text, flags=re.DOTALL)
+        # Rimuove indicazioni di pagina che spesso precedono dati spazzatura
+        text = re.sub(r"Page \d+ of \d+.*$", "", text, flags=re.MULTILINE)
 
         return text
 
     @staticmethod
     def extract_lap_times_strings(text):
         """
-        Estrae i tempi giro validi dal blocco di testo di un pilota.
-        Ignora i giri rientrati ai box o incompleti poiché non fanno match con i 4 settori e la velocità.
+        Estrae i tempi giro ignorando eventuali righe di disturbo
+        (nomi piloti, posizioni, intestazioni) nel mezzo della tabella.
         """
-        # Il pattern cerca: TempoGiro + LapNumber + Settore1 + Settore2 + Settore3 + Velocità + Settore4
+        # Il pattern cerca: Min'Sec.Ms + NumeroGiro (opzionale) + Settori (opzionali)
+        # Usiamo il flag re.DOTALL per far sì che il punto '.' possa corrispondere anche al carattere a capo
         pattern = re.compile(
-            r"(\d{1,2})'(\d{2}\.\d{3})\*?"  # Gruppo 1: min, Gruppo 2: sec.ms (con opzionale * di cancellazione)
-            r"\s*\d+\*?"  # Numero del giro (spazio opzionale)
-            rf"\s+({SECTOR_TIME})\*?"  # Settore 1
-            rf"\s+({SECTOR_TIME})\*?"  # Settore 2
-            rf"\s+({SECTOR_TIME})\*?"  # Settore 3
-            r"\s+\d+\.\d"  # Velocità max (FISSATA A 1 DECIMALE per evitare sovrapposizioni)
-            rf"\s*({SECTOR_TIME})\*?",  # Settore 4 (SPAZIO OPZIONALE tra velocità e settore 4)
+            r"(\d{1,2})'(\d{2}\.\d{3})"  # Tempo
+            r"(?:\s*\d+)?"  # Numero giro (opzionale)
+            r"(?:"  # Blocco settori opzionale
+            r"(?:\s+" + SECTOR_TIME + r")+"  # Qualsiasi sequenza di settori
+                                      r")?",
             re.MULTILINE
         )
 
         lap_times = []
         for match in pattern.finditer(text):
-            try:
-                # Creiamo direttamente la stringa formattata: "1:32.456"
-                lap_time_str = f"{match.group(1)}:{match.group(2)}"
-                lap_times.append(lap_time_str)
-            except IndexError as e:
-                print(f"Errore processamento dati: {e}")
-                continue
+            # Filtro di sicurezza: escludiamo stringhe che sembrano settori solitari
+            # o dati spazzatura che la regex potrebbe aver catturato per errore
+            time_str = f"{match.group(1)}:{match.group(2)}"
+            lap_times.append(time_str)
+
         return lap_times
 
     @staticmethod
@@ -87,13 +83,13 @@ class Analyzer:
         come delimitatori, ed estrae i relativi tempi sul giro tramite Regex tolleranti.
         """
         text = Analyzer.extract_all_text(year, granprix)
-        #print(text)
+        print(text)
         if not text:
             return []
 
         # Otteniamo i piloti iscritti per quell'evento
         riders = get_riders_info(year, granprix, "MotoGP")
-        #print(riders)
+        print(riders)
         pilot_positions = []
         for rider in riders:
             # riders: [numero, costruttore, team, cognome, nome, nazionalità]
@@ -103,7 +99,8 @@ class Analyzer:
 
             # Prendiamo solo i primi 8 caratteri del cognome per evitare problemi
             # di troncamento a fine riga da parte del PDF (es. DI GIANNANTONI7th)
-            short_surname = surname[:8]
+
+            short_surname = surname[:6]
 
             # Rendiamo sicuri i nomi per la regex (evita errori con gli apostrofi)
             # e permettiamo spazi opzionali nel cognome (es. "DI GIANN" -> "DI\s*GIANN")
