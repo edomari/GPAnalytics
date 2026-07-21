@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MotoGPStats</title>
+    <link rel="icon" type="image/png" href="/static/images/logo_small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -13,10 +14,11 @@
     <div class="home-bg" aria-hidden="true"></div>
 
     <main class="home-stage">
-        <p class="home-eyebrow">MotoGPStats // Archivio gare</p>
-        <h1 class="home-title">Seleziona<br>il tuo<br><span>Gran Premio</span></h1>
+        <p class="home-eyebrow">MotoGPStats // Document Archive</p>
+        <h1 class="home-title">Select<br>your<br><span>Document</span></h1>
 
-        <form action="/results" method="POST" class="home-form" id="raceForm">
+        <form class="home-form" id="raceForm" action="/results" method="POST">
+            <input type="hidden" name="sessionId" id="sessionIdHidden">
 
             <div class="lights-rig" id="lightsRig" aria-hidden="true">
                 <span class="light" data-light="1"></span>
@@ -26,36 +28,72 @@
                 <span class="light" data-light="5"></span>
             </div>
 
-            <div class="field-grid" id="fieldGrid">
-                <div class="field">
-                    <label for="year">Anno</label>
-                    <select id="year" name="year" required>
-                        <option value="" disabled selected>--</option>
-                        {% for year in range(2002, 2027) %}
-                            <option value="{{ year }}">{{ year }}</option>
-                        {% endfor %}
-                    </select>
+            <div class="selection-pipeline" id="fieldGrid">
+
+                <div class="pipeline-step">
+                    <div class="step-indicator">01</div>
+                    <div class="step-content">
+                        <label for="year">Championship Year</label>
+                        <div class="select-wrapper">
+                            <select id="year" name="year" required>
+                                <option value="" disabled selected>Loading years...</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="field" id="categoryField" style="display:none">
-                    <label for="sessionType">Sessione</label>
-                    <select id="sessionType" name="sessionType">
-                        <option value="" disabled selected>Seleziona...</option>
-                        <option value="RAC">Gara (RAC)</option>
-                        <option value="SPR">Sprint (SPR)</option>
-                    </select>
+                <div class="pipeline-step">
+                    <div class="step-indicator">02</div>
+                    <div class="step-content">
+                        <label for="granPrix">Circuit / Event</label>
+                        <div class="select-wrapper">
+                            <select id="granPrix" name="granPrix" disabled required>
+                                <option value="">Select the year first</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="field">
-                    <label for="granPrix">Circuito</label>
-                    <select id="granPrix" name="granPrix" disabled>
-                        <option value="">Seleziona prima l'anno</option>
-                    </select>
+                <div class="pipeline-step">
+                    <div class="step-indicator">03</div>
+                    <div class="step-content">
+                        <label for="category">Category</label>
+                        <div class="select-wrapper">
+                            <select id="category" name="category" disabled required>
+                                <option value="">Select the circuit first</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="pipeline-step">
+                    <div class="step-indicator">04</div>
+                    <div class="step-content">
+                        <label for="sessionType">Official Session</label>
+                        <div class="select-wrapper">
+                            <select id="sessionType" name="sessionType" disabled required>
+                                <option value="">Select the category first</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-step">
+                    <div class="step-indicator">05</div>
+                    <div class="step-content">
+                        <label for="pdfUrl">Analysis Document (PDF)</label>
+                        <div class="select-wrapper">
+                            <select id="pdfUrl" name="pdfUrl" disabled required>
+                                <option value="">Select the session first</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <button class="button-54 lights-out-btn" role="button" type="submit" id="submitBtn" disabled>
-                <span class="btn-default">Lights out</span>
+                <span class="btn-default">Open</span>
                 <span class="btn-arrow" aria-hidden="true">&rarr;</span>
             </button>
         </form>
@@ -66,95 +104,176 @@
         const submitBtn = document.getElementById('submitBtn');
         const yearSelect = document.getElementById('year');
         const gpSelect = document.getElementById('granPrix');
-        const categoryField = document.getElementById('categoryField');
+        const categorySelect = document.getElementById('category');
         const sessionSelect = document.getElementById('sessionType');
+        const pdfSelect = document.getElementById('pdfUrl');
         const form = document.getElementById('raceForm');
 
-        const FIRST_SPRINT_YEAR = 2023;
+        let currentSessionsData = [];
 
         function setLight(index, on) {
             if (lights[index]) lights[index].classList.toggle('on', on);
         }
 
-        // Mostra il campo "Sessione" (RAC/SPR) solo per gli anni in cui esiste la Sprint Race
-        function setCategoryVisible(visible) {
-            categoryField.style.display = visible ? '' : 'none';
-            sessionSelect.disabled = !visible;
-            sessionSelect.required = visible;
-            if (!visible) {
-                sessionSelect.value = '';
+        function updateLights() {
+            const hasYear = !!yearSelect.value;
+            const hasGp = !!gpSelect.value;
+            const hasCategory = !!categorySelect.value;
+            const hasSession = !!sessionSelect.value;
+            const hasPdf = !!pdfSelect.value;
+
+            setLight(0, hasYear);
+            setLight(1, hasGp);
+            setLight(2, hasCategory);
+            setLight(3, hasSession);
+            setLight(4, hasPdf);
+
+            submitBtn.disabled = !hasPdf;
+        }
+
+        function resetSelects(selectsToReset) {
+            selectsToReset.forEach(sel => {
+                sel.innerHTML = '<option value="">Waiting for the previous field...</option>';
+                sel.disabled = true;
+            });
+            updateLights();
+        }
+
+        // 1. LOAD YEARS
+        async function loadSeasons() {
+            try {
+                const response = await fetch('/api/seasons');
+                if (!response.ok) throw new Error("API Error");
+                const data = await response.json();
+
+                yearSelect.innerHTML = '<option value="" disabled selected>-- Select Year --</option>';
+                data.forEach(season => {
+                    const option = document.createElement('option');
+                    option.value = season.id;
+                    option.textContent = season.year;
+                    yearSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error:", error);
+                yearSelect.innerHTML = '<option value="" disabled selected>Server error</option>';
             }
         }
+        loadSeasons();
 
-        function updateLights() {
-            const yearReady = !!yearSelect.value;
-            const categoryVisible = categoryField.style.display !== 'none';
-            const categoryReady = !categoryVisible || !!sessionSelect.value;
-            const trackReady = !!gpSelect.value && !gpSelect.disabled;
-            const gpReady = yearReady && categoryReady && trackReady;
-
-            setLight(0, yearReady);
-            setLight(1, yearReady && categoryReady);
-            setLight(2, gpReady);
-            setLight(3, gpReady);
-            setLight(4, gpReady);
-
-            submitBtn.disabled = !gpReady;
-        }
-
+        // 2. LOAD CIRCUITS
         yearSelect.addEventListener('change', async function() {
-            const year = this.value;
-
-            setCategoryVisible(year !== '' && parseInt(year, 10) >= FIRST_SPRINT_YEAR);
-
-            gpSelect.innerHTML = '<option value="">Caricamento tracciati in corso...</option>';
-            gpSelect.disabled = true;
-            updateLights();
-
+            resetSelects([gpSelect, categorySelect, sessionSelect, pdfSelect]);
+            gpSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                // Chiama la nuova API Flask
-                const response = await fetch(`/api/tracks/${year}`);
+                const response = await fetch(`/api/tracks/${this.value}`);
                 const tracks = await response.json();
 
-                gpSelect.innerHTML = '';
+                if (!response.ok) throw new Error(tracks.error || "API Error");
 
-                if (tracks && tracks.length > 0) {
-                    const placeholder = document.createElement('option');
-                    placeholder.value = '';
-                    placeholder.disabled = true;
-                    placeholder.selected = true;
-                    placeholder.textContent = "Seleziona il circuito...";
-                    gpSelect.appendChild(placeholder);
-
-                    tracks.forEach(track => {
-                        const option = document.createElement('option');
-                        // Nel tuo backend c'è già il metodo .upper() su granPrix,
-                        // quindi va bene usare l'abbreviazione diretta
-                        option.value = track;
-                        option.textContent = track;
-                        gpSelect.appendChild(option);
-                    });
-                    gpSelect.disabled = false;
-                } else {
-                    gpSelect.innerHTML = '<option value="">Nessun tracciato trovato</option>';
-                }
+                gpSelect.innerHTML = '<option value="" disabled selected>-- Select Circuit --</option>';
+                tracks.forEach(track => {
+                    const option = document.createElement('option');
+                    option.value = track.id;
+                    option.textContent = track.name;
+                    gpSelect.appendChild(option);
+                });
+                gpSelect.disabled = false;
             } catch (error) {
-                console.error("Errore nel recupero dei tracciati:", error);
-                gpSelect.innerHTML = '<option value="">Errore di caricamento</option>';
+                console.error(error);
+                gpSelect.innerHTML = '<option value="">Loading error</option>';
             }
             updateLights();
         });
 
-        sessionSelect.addEventListener('change', updateLights);
-        gpSelect.addEventListener('change', updateLights);
+        // 3. LOAD CATEGORIES
+        gpSelect.addEventListener('change', async function() {
+            resetSelects([categorySelect, sessionSelect, pdfSelect]);
+            categorySelect.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const response = await fetch(`/api/categories/${this.value}`);
+                const categories = await response.json();
 
-        form.addEventListener('submit', function(event) {
-            if (submitBtn.disabled) {
-                event.preventDefault();
-                return;
+                if (!response.ok) throw new Error(categories.error || "API Error");
+
+                categorySelect.innerHTML = '<option value="" disabled selected>-- Select Category --</option>';
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    categorySelect.appendChild(option);
+                });
+                categorySelect.disabled = false;
+            } catch (error) {
+                console.error(error);
+                categorySelect.innerHTML = '<option value="">Loading error</option>';
             }
-            // Piccola animazione "lights out" alla partenza prima dell'invio
+            updateLights();
+        });
+
+        // 4. LOAD SESSIONS
+        categorySelect.addEventListener('change', async function() {
+            resetSelects([sessionSelect, pdfSelect]);
+            document.getElementById('sessionIdHidden').value = '';
+            sessionSelect.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const eventId = gpSelect.value;
+                const response = await fetch(`/api/sessions/${eventId}/${this.value}`);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || "API Error");
+
+                currentSessionsData = data;
+
+                sessionSelect.innerHTML = '<option value="" disabled selected>-- Select Session --</option>';
+                currentSessionsData.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.type;
+                    option.dataset.id = session.id;   // Session UUID → for classification fallback
+                    option.textContent = session.type;
+                    sessionSelect.appendChild(option);
+                });
+                sessionSelect.disabled = false;
+            } catch (error) {
+                console.error(error);
+                sessionSelect.innerHTML = '<option value="">Loading error</option>';
+            }
+            updateLights();
+        });
+
+        // Update sessionIdHidden when the user chooses the session
+        sessionSelect.addEventListener('change', function() {
+            const selected = sessionSelect.options[sessionSelect.selectedIndex];
+            document.getElementById('sessionIdHidden').value = selected?.dataset?.id || '';
+        });
+
+        // 5. LOAD PDF
+        sessionSelect.addEventListener('change', function() {
+            resetSelects([pdfSelect]);
+            const sessionData = currentSessionsData.find(s => s.type === this.value);
+            pdfSelect.innerHTML = '<option value="" disabled selected>-- Select PDF --</option>';
+
+            if (sessionData?.files?.length > 0) {
+                sessionData.files.forEach(fileObj => {
+                    if (!fileObj.url) return;
+                    const option = document.createElement('option');
+                    option.value = fileObj.url;
+                    option.textContent = fileObj.name;
+                    pdfSelect.appendChild(option);
+                });
+                pdfSelect.disabled = false;
+            } else {
+                pdfSelect.innerHTML = '<option value="">No documents available</option>';
+            }
+            updateLights();
+        });
+
+        pdfSelect.addEventListener('change', updateLights);
+
+        // SUBMIT ANIMATION WITH LIGHTS EFFECT
+        form.addEventListener('submit', function(event) {
             event.preventDefault();
+            if (submitBtn.disabled) return;
+
             lights.forEach(l => { l.classList.remove('on'); l.classList.add('out'); });
             setTimeout(() => form.submit(), 350);
         });

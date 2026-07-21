@@ -1,102 +1,23 @@
+/* ============================================
+   FONTS & GLOBAL
+   ============================================ */
 @font-face {
-    font-family: 'MotoGP';
+    font-family: 'MotoGPText';
     src: url('/static/fonts/MotoGPText-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }
 
 body {
-    font-family: 'MotoGP', sans-serif;
+    margin: 0;
+    font-family: 'MotoGPText', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-.pilots-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-.pilot {
-    width: 30%;
-    border: 1px solid #ddd;
-    padding: 10px;
-    box-sizing: border-box;
-}
-.pilot h2 {
-    text-align: center;
-}
-.lap-time {
-    text-align: center;
-    padding: 5px 0;
-}
-.average-time {
-    margin-top: 10px;
-    text-align: center;
-    font-weight: bold;
-}
-.fastest-lap, .slowest-lap {
-    margin-top: 10px;
-    text-align: center;
-}
-
-.selected {
-    background-color: green;
-    color: white;
-}
-.unselected {
-    background-color: red;
-    color: white;
-}
-
-h1 {
-    text-align: center;
-}
-canvas {
-    width: 100%;
-    height: 300px;
-}
-@font-face {
-    font-family: 'MioFont';
-    src: url('/static/fonts/MotoGPText-Regular.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-}
-
-.home {
-    font-family: 'MioFont'; 
-}
-
-.button-54 {
-    font-family: "Open Sans", sans-serif;
-    font-size: 16px;
-    letter-spacing: 2px;
-    text-decoration: none;
-    text-transform: uppercase;
-    color: #000;
-    cursor: pointer;
-    border: 3px solid;
-    padding: 0.25em 0.5em;
-    box-shadow: 1px 1px 0px 0px, 2px 2px 0px 0px, 3px 3px 0px 0px, 4px 4px 0px 0px, 5px 5px 0px 0px;
-    position: relative;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: manipulation;
-    background-color: white;
-}
-
-.button-54:active {
-    box-shadow: 0px 0px 0px 0px;
-    top: 5px;
-    left: 5px;
-}
-
-@media (min-width: 768px) {
-    .button-54 {
-        padding: 0.25em 0.75em;
-    }
-}
 /* ============================================
    HOME — Griglia di partenza (start grid) theme
    ============================================ */
-
 .home {
     --asphalt-900: #0a0b0d;
     --asphalt-700: #15171b;
@@ -108,16 +29,11 @@ canvas {
     --paper: #f2f1ec;
     --grid-line: rgba(242, 241, 236, 0.06);
 
-    margin: 0;
     min-height: 100vh;
     background: var(--asphalt-900);
     color: var(--paper);
     position: relative;
     overflow-x: hidden;
-}
-
-.home h1 {
-    text-align: left;
 }
 
 .home-bg {
@@ -151,7 +67,7 @@ canvas {
 }
 
 .home-title {
-    font-family: 'Oswald', 'MioFont', sans-serif;
+    font-family: 'Oswald', 'MotoGPText', sans-serif;
     font-weight: 700;
     text-transform: uppercase;
     font-style: italic;
@@ -159,6 +75,7 @@ canvas {
     line-height: 0.98;
     letter-spacing: 0.01em;
     margin: 0;
+    text-align: left;
     transform: skewX(-3deg);
 }
 
@@ -204,77 +121,163 @@ canvas {
     transition: background-color 0.15s ease;
 }
 
-/* Selettori anno / circuito */
-.field-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-}
-
-.field {
+/* ============================================
+   SELETTORI - Stile Pipeline/Timeline
+   ============================================ */
+.selection-pipeline {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 1.5rem;
+    position: relative;
+    padding-left: 1rem;
 }
 
-.field label {
+/* Linea verticale di connessione */
+.selection-pipeline::before {
+    content: '';
+    position: absolute;
+    left: 2.2rem;
+    top: 1rem;
+    bottom: 1rem;
+    width: 2px;
+    background: var(--asphalt-600);
+    z-index: 0;
+}
+
+.pipeline-step {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+
+/* Gestione visiva automatica basata sullo stato "disabled" della select */
+.pipeline-step:has(select:disabled) {
+    opacity: 0.4;
+    filter: grayscale(100%);
+}
+
+.step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: var(--asphalt-900);
+    border: 2px solid var(--asphalt-600);
+    border-radius: 50%;
     font-family: 'Space Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.14em;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--asphalt-600);
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.pipeline-step:has(select:not(:disabled)) .step-indicator {
+    border-color: var(--race-red);
+    color: var(--race-red);
+    box-shadow: 0 0 10px rgba(215, 25, 33, 0.3);
+}
+
+.step-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.step-content label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgba(242, 241, 236, 0.55);
+    color: var(--flag-yellow);
 }
 
-.field select {
-    font-family: 'Space Mono', monospace;
-    font-size: 1rem;
-    padding: 0.7rem 0.8rem;
+/* Wrapper per l'icona custom della freccia */
+.select-wrapper {
+    position: relative;
+}
+
+.select-wrapper::after {
+    content: '▼';
+    font-size: 0.7rem;
+    color: var(--paper);
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.step-content select {
+    width: 100%;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    padding: 0.8rem 2.5rem 0.8rem 1rem;
     background: var(--asphalt-700);
     border: 1px solid var(--asphalt-600);
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--paper);
     appearance: none;
+    -webkit-appearance: none;
     cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.field select:focus-visible {
-    outline: 2px solid var(--flag-yellow);
-    outline-offset: 2px;
+.step-content select:focus-visible {
+    outline: none;
+    border-color: var(--flag-yellow);
+    box-shadow: 0 0 0 2px rgba(255, 212, 0, 0.2);
 }
 
-.field select:disabled {
-    color: rgba(242, 241, 236, 0.35);
+.step-content select:disabled {
     cursor: not-allowed;
+    background: var(--asphalt-900);
 }
 
 /* Pulsante di invio in stile "start button" */
-.home .button-54 {
+.button-54 {
     font-family: 'Oswald', sans-serif;
+    font-size: 16px;
     font-style: italic;
+    letter-spacing: 2px;
     text-transform: uppercase;
     background-color: var(--race-red);
     color: var(--paper);
-    border-color: var(--paper);
+    border: 3px solid var(--paper);
     box-shadow: 1px 1px 0 0 #000, 2px 2px 0 0 #000, 3px 3px 0 0 #000, 4px 4px 0 0 #000, 5px 5px 0 0 #000;
     display: inline-flex;
     align-items: center;
     gap: 0.6rem;
+    padding: 0.25em 0.75em;
     width: fit-content;
     align-self: flex-start;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
-.home .button-54:disabled {
+.button-54:disabled {
     background-color: var(--asphalt-600);
     color: rgba(242, 241, 236, 0.4);
     border-color: rgba(242, 241, 236, 0.2);
     cursor: not-allowed;
 }
 
-.home .button-54:active:not(:disabled) {
+.button-54:active:not(:disabled) {
     box-shadow: 0 0 0 0;
+    top: 5px;
+    left: 5px;
 }
 
-.home .button-54:focus-visible {
+.button-54:focus-visible {
     outline: 2px solid var(--flag-yellow);
     outline-offset: 3px;
 }
@@ -283,7 +286,7 @@ canvas {
     transition: transform 0.2s ease;
 }
 
-.home .button-54:hover:not(:disabled) .btn-arrow {
+.button-54:hover:not(:disabled) .btn-arrow {
     transform: translateX(4px);
 }
 
@@ -294,10 +297,10 @@ canvas {
     }
 }
 
+
 /* ============================================
    RESULTS — Cronometraggio (timing tower) theme
    ============================================ */
-
 .results {
     --asphalt-900: #0a0b0d;
     --asphalt-700: #15171b;
@@ -308,16 +311,11 @@ canvas {
     --paper: #f2f1ec;
     --grid-line: rgba(242, 241, 236, 0.06);
 
-    margin: 0;
     min-height: 100vh;
     background: var(--asphalt-900);
     color: var(--paper);
     position: relative;
     overflow-x: hidden;
-}
-
-.results h1 {
-    text-align: left;
 }
 
 .results-bg {
@@ -328,42 +326,6 @@ canvas {
     background-image:
         repeating-linear-gradient(115deg, var(--grid-line) 0px, var(--grid-line) 1px, transparent 1px, transparent 64px),
         linear-gradient(180deg, var(--asphalt-900) 0%, var(--asphalt-700) 100%);
-}
-
-.global-action-btn {
-    font-family: 'Oswald', sans-serif;
-    font-style: italic;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.04em;
-    background-color: var(--race-red);
-    color: var(--paper);
-    border: 2px solid var(--paper);
-    border-radius: 4px;
-    padding: 0.55rem 1rem;
-    width: fit-content;
-    cursor: pointer;
-    margin-top: 0.6rem;
-    box-shadow: 1px 1px 0 0 #000, 2px 2px 0 0 #000, 3px 3px 0 0 #000;
-    transition: transform 0.1s ease;
-}
-
-.global-action-btn:hover {
-    filter: brightness(1.1);
-}
-
-.global-action-btn:active {
-    box-shadow: 0 0 0 0;
-    transform: translate(3px, 3px);
-}
-
-.global-action-btn:focus-visible {
-    outline: 2px solid var(--flag-yellow);
-    outline-offset: 3px;
-}
-
-.global-action-btn[aria-pressed="true"] {
-    background-color: var(--podium-green);
 }
 
 .results-header {
@@ -411,20 +373,12 @@ canvas {
     padding: 0.3rem 0.65rem;
     border-radius: 3px;
     margin: 0.3rem 0 0.2rem;
-}
-
-.session-badge.race {
-    background: var(--race-red);
-    color: var(--paper);
-}
-
-.session-badge.sprint {
-    background: var(--flag-yellow);
-    color: #1a1a1a;
+    background: var(--paper);
+    color: var(--asphalt-900);
 }
 
 .results-title {
-    font-family: 'Oswald', 'MioFont', sans-serif;
+    font-family: 'Oswald', 'MotoGPText', sans-serif;
     font-weight: 700;
     text-transform: uppercase;
     font-style: italic;
@@ -432,6 +386,7 @@ canvas {
     line-height: 1;
     letter-spacing: 0.01em;
     margin: 0;
+    text-align: left;
     transform: skewX(-3deg);
 }
 
@@ -447,6 +402,42 @@ canvas {
     margin: 0;
 }
 
+.global-action-btn {
+    font-family: 'Oswald', sans-serif;
+    font-style: italic;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    background-color: var(--race-red);
+    color: var(--paper);
+    border: 2px solid var(--paper);
+    border-radius: 4px;
+    padding: 0.55rem 1rem;
+    width: fit-content;
+    cursor: pointer;
+    margin-top: 0.6rem;
+    box-shadow: 1px 1px 0 0 #000, 2px 2px 0 0 #000, 3px 3px 0 0 #000;
+    transition: transform 0.1s ease;
+}
+
+.global-action-btn:hover {
+    filter: brightness(1.1);
+}
+
+.global-action-btn:active {
+    box-shadow: 0 0 0 0;
+    transform: translate(3px, 3px);
+}
+
+.global-action-btn:focus-visible {
+    outline: 2px solid var(--flag-yellow);
+    outline-offset: 3px;
+}
+
+.global-action-btn[aria-pressed="true"] {
+    background-color: var(--podium-green);
+}
+
 .grid-stage {
     position: relative;
     z-index: 1;
@@ -455,7 +446,7 @@ canvas {
     padding: 1rem 1.5rem 4rem;
 }
 
-.results .pilots-row {
+.pilots-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -463,7 +454,7 @@ canvas {
     margin-bottom: 1.2rem;
 }
 
-.results .pilot {
+.pilot {
     width: calc((100% - 2.4rem) / 3);
     min-width: 260px;
     flex: 1 1 260px;
@@ -510,8 +501,8 @@ canvas {
     color: #1a1a1a;
 }
 
-.results .pilot h2 {
-    font-family: 'Oswald', 'MioFont', sans-serif;
+.pilot h2 {
+    font-family: 'Oswald', 'MotoGPText', sans-serif;
     font-weight: 600;
     text-transform: uppercase;
     font-size: 1rem;
@@ -530,7 +521,7 @@ canvas {
     margin-bottom: 0.9rem;
 }
 
-.results .lap-time {
+.lap-time {
     display: flex;
     align-items: center;
     gap: 0.6rem;
@@ -552,7 +543,7 @@ canvas {
     flex-grow: 1;
 }
 
-.results .lap-time button {
+.lap-time button {
     font-size: 0;
     width: 1.5rem;
     height: 1.5rem;
@@ -563,7 +554,7 @@ canvas {
     flex-shrink: 0;
 }
 
-.results .lap-time button::after {
+.lap-time button::after {
     position: absolute;
     inset: 0;
     display: flex;
@@ -574,25 +565,25 @@ canvas {
     line-height: 1;
 }
 
-.results .lap-time button.selected {
+.lap-time button.selected {
     background-color: var(--podium-green);
     color: #06210f;
 }
 
-.results .lap-time button.selected::after {
+.lap-time button.selected::after {
     content: "✓";
 }
 
-.results .lap-time button.unselected {
+.lap-time button.unselected {
     background-color: var(--race-red);
     color: #2a0405;
 }
 
-.results .lap-time button.unselected::after {
+.lap-time button.unselected::after {
     content: "✕";
 }
 
-.results .lap-time button:focus-visible {
+.lap-time button:focus-visible {
     outline: 2px solid var(--flag-yellow);
     outline-offset: 2px;
 }
@@ -607,9 +598,9 @@ canvas {
     margin-bottom: 0.9rem;
 }
 
-.results .average-time,
-.results .fastest-lap,
-.results .slowest-lap {
+.average-time,
+.fastest-lap,
+.slowest-lap {
     font-family: 'Space Mono', monospace;
     font-size: 0.78rem;
     text-align: left;
@@ -617,15 +608,15 @@ canvas {
     font-weight: 400;
 }
 
-.results .average-time {
+.average-time {
     color: var(--flag-yellow);
 }
 
-.results .fastest-lap {
+.fastest-lap {
     color: var(--podium-green);
 }
 
-.results .slowest-lap {
+.slowest-lap {
     color: var(--race-red);
 }
 
@@ -680,19 +671,22 @@ canvas {
     margin: 0.4rem 0 0;
 }
 
-.results canvas {
+canvas {
     width: 100%;
     height: 220px;
 }
 
+/* ============================================
+   RESPONSIVE (Results Page)
+   ============================================ */
 @media (max-width: 900px) {
-    .results .pilot {
+    .pilot {
         width: calc((100% - 1.2rem) / 2);
     }
 }
 
 @media (max-width: 600px) {
-    .results .pilot {
+    .pilot {
         width: 100%;
     }
 }

@@ -1,160 +1,164 @@
-import re
-from io import BytesIO
-
-import requests
-from pypdf import PdfReader
+"""
+Extraction and analysis of lap times from MotoGP analysis PDFs.
+"""
 import logging
-import pycountry
+import re
+from typing import List, Tuple
 
-from utils.http_client import download_first_available_pdf
-from utils.riders import get_riders_info
+from pypdf import PdfReader
 
-# Frammento regex per riconoscere un tempo giro (es. 1'34.186) o un tempo parziale
-LAP_TIME = r"\d{1,2}'\d{2}\.\d{3}"
-SECTOR_TIME = rf"(?:{LAP_TIME}|\d+\.\d{{3}})"
-BASE_URL = "https://resources.motogp.com/files/results"
+from exceptions import DataNotFoundError
+from utils import http_client
+from utils.riders import get_riders_info, get_rider_visuals
 
 logger = logging.getLogger(__name__)
 
-class Analyzer:
-    @staticmethod
-    def get_pdf_data(year, gp_name, sessionType):
-        """
-        Scarica il PDF di analisi della gara in formato BytesIO.
-        """
-        urls = [
-            f"{BASE_URL}/{year}/{gp_name}/MotoGP/{sessionType}/Analysis.pdf",
-            f"{BASE_URL}/{year}/MotoGP/{gp_name}/{sessionType}/analysis.pdf",
-        ]
-        return download_first_available_pdf(urls)
+class SessionAnalyzer:
+    """
+    Analyzer dedicated to a single MotoGP session.
+    Maintains state (URL, ID) to avoid repeatedly passing parameters.
+    """
 
-    @staticmethod
-    def extract_all_text(year, granprix, sessionType):
+    def __init__(self, pdf_url: str, event_id: str, category_id: str, session_type: str, session_id: str = ""):
+        self.pdf_url = pdf_url
+        self.event_id = event_id
+        self.category_id = category_id
+        self.session_type = session_type
+        self.session_id = session_id
+
+        # Immediately extract the year and GP, and save them as instance state
+        self.year, self.gp_name = self._parse_url()
+
+    def _parse_url(self) -> Tuple[int, str]:
         """
-        Estrae tutto il testo grezzo dal PDF, pulendolo da piè di pagina
-        e righe del 'Fastest Lap' che interferiscono con l'estrazione.
+        Extracts the year and GP acronym from the PDF URL saved in self.pdf_url.
+
+        :return: A tuple containing the year and the GP name.
+        :rtype: Tuple[int, str]
+        :raises DataNotFoundError: If the year or GP cannot be extracted from the URL.
         """
-        pdf_data = Analyzer.get_pdf_data(year, granprix, sessionType)
+        parts = self.pdf_url.rstrip("/").split("/")
+        try:
+            idx = parts.index("results")
+            year = int(parts[idx + 1])
+            gp_name = parts[idx + 2]
+            return year, gp_name
+        except (ValueError, IndexError) as exc:
+            raise DataNotFoundError(
+                f"Unable to extract year/GP from URL: {self.pdf_url}"
+            ) from exc
+
+    def _extract_all_text(self) -> str:
+        """
+        Extracts and cleans all raw text from the PDF.
+
+        :return: The cleaned extracted text.
+        :rtype: str
+        :raises DataNotFoundError: If no PDF is available at the provided URL.
+        """
+        pdf_data = http_client.get_pdf_data(self.pdf_url)
         if not pdf_data:
-            return ""
+            raise DataNotFoundError(
+                f"No PDF available at URL: {self.pdf_url}"
+            )
 
         reader = PdfReader(pdf_data)
         text = "\n".join(page.extract_text() for page in reader.pages)
 
-        # Rimuove righe che contengono 'Fastest Lap' (es. '1'56.528 ... Fastest Lap')
-        # Il flag MULTILINE assicura che ^ e $ si riferiscano a inizio/fine riga
+        # Removes rows containing 'Fastest Lap' and page indications
         text = re.sub(r"^.*Fastest Lap.*$", "", text, flags=re.MULTILINE)
-
-        # Rimuove indicazioni di pagina che spesso precedono dati spazzatura
         text = re.sub(r"Page \d+ of \d+.*$", "", text, flags=re.MULTILINE)
 
         return text
 
-    @staticmethod
-    def extract_lap_times_strings(text):
+    def _extract_lap_times_strings(self, text_block: str) -> List[str]:
         """
-        Estrae i tempi giro ignorando eventuali righe di disturbo
-        (nomi piloti, posizioni, intestazioni) nel mezzo della tabella.
-        """
-        # Il pattern cerca: Min'Sec.Ms + NumeroGiro (opzionale) + Settori (opzionali)
-        # Usiamo il flag re.DOTALL per far sì che il punto '.' possa corrispondere anche al carattere a capo
-        pattern = re.compile(
-            r"(\d{1,2})'(\d{2}\.\d{3})"  # Tempo
-            r"(?:\s*\d+)?"  # Numero giro (opzionale)
-            r"(?:"  # Blocco settori opzionale
-            r"(?:\s+" + SECTOR_TIME + r")+"  # Qualsiasi sequenza di settori
-                                      r")?",
-            re.MULTILINE
-        )
+        Extracts lap times from a rider's specific text block by processing it line by line.
+        Looks only for the first occurrence of a time (e.g., 1'56.626) on each line.
+        This automatically handles cases where sectors are missing or the lap number
+        is concatenated to the milliseconds (e.g., 1'56.9737).
 
+        :param text_block: The raw text block for a specific rider.
+        :type text_block: str
+        :return: A list of formatted lap time strings.
+        :rtype: List[str]
+        """
         lap_times = []
-        for match in pattern.finditer(text):
-            # Filtro di sicurezza: escludiamo stringhe che sembrano settori solitari
-            # o dati spazzatura che la regex potrebbe aver catturato per errore
-            time_str = f"{match.group(1)}:{match.group(2)}"
-            lap_times.append(time_str)
+        # Pattern that searches exactly for the minute'seconds.milliseconds format
+        pattern = re.compile(r"(\d{1,2})'(\d{2}\.\d{3})")
+
+        for line in text_block.splitlines():
+            # search() finds only the first occurrence in the string, ignoring everything else
+            match = pattern.search(line)
+            if match:
+                lap_times.append(f"{match.group(1)}:{match.group(2)}")
 
         return lap_times
 
-    @staticmethod
-    def process_pilots_data(year, granprix, sessionType):
+    def process_data(self) -> dict:
         """
-        Trova i blocchi di testo per ogni pilota usando i nomi estratti dall'entry list
-        come delimitatori, ed estrae i relativi tempi sul giro tramite Regex tolleranti.
+        Main public method.
+        Manages the data extraction flow and returns the results dictionary.
+
+        :return: A dictionary containing the parsed session data and rider lap times.
+        :rtype: dict
+        :raises DataNotFoundError: If the entry list is unavailable for the event.
         """
-        text = Analyzer.extract_all_text(year, granprix, sessionType)
+        text = self._extract_all_text()
         print(text)
-        if not text:
-            return []
 
-        # Otteniamo i piloti iscritti per quell'evento
-        riders = get_riders_info(year, granprix, "MotoGP")
+        riders = get_riders_info(self.event_id, self.category_id, self.session_id, self.year)
         print(riders)
-        pilot_positions = []
+        if not riders:
+            raise DataNotFoundError(
+                f"No entry list available for the event {self.gp_name} {self.year}"
+            )
+
+        # Map full_name → rider UUID to fetch visuals
+        rider_uuid_by_name = {rider.full_name: rider.id for rider in riders}
+
+        # 1. Find the riders' positions within the text
+        pilot_positions: List[Tuple[int, str]] = []
         for rider in riders:
-            # riders: [numero, costruttore, team, cognome, nome, nazionalità]
-            name = rider[4]
-            surname = rider[3]
-            full_name_display = f"{name} {surname}"
+            first_two_name = rider.name[:2]
 
-            # Prendiamo solo i primi 8 caratteri del cognome per evitare problemi
-            # di troncamento a fine riga da parte del PDF (es. DI GIANNANTONI7th)
+            surname_parts = rider.surname.split()
+            surname_key = surname_parts[0] if surname_parts else rider.name
 
-            short_surname = surname[:6]
-
-            # Rendiamo sicuri i nomi per la regex (evita errori con gli apostrofi)
-            # e permettiamo spazi opzionali nel cognome (es. "DI GIANN" -> "DI\s*GIANN")
-            safe_name = re.escape(name)
-            safe_surname = re.escape(short_surname).replace(r"\ ", r"\s*")
-
-            # Pattern: cerca il nome seguito da almeno uno spazio e dai primi caratteri del cognome
-            pattern = re.compile(rf"{safe_name}\s+{safe_surname}", re.IGNORECASE)
+            pattern_str = rf"{re.escape(first_two_name)}.*{re.escape(surname_key)}"
+            pattern = re.compile(pattern_str, re.IGNORECASE)
 
             match = pattern.search(text)
             if match:
-                # match.start() restituisce la posizione esatta in cui inizia il nome nel testo
-                pilot_positions.append((match.start(), full_name_display))
+                pilot_positions.append((match.start(), rider.full_name))
+            else:
+                logger.debug("Pattern not found for: %s...%s", first_two_name, surname_key)
 
-        # Ordiniamo l'elenco in base a come appaiono nel documento
-        pilot_positions.sort(key=lambda x: x[0])
+        pilot_positions.sort(key=lambda item: item[0])
 
+        # 2. Extract lap times and visuals for each rider
         pilots_data = []
-
-        # Usiamo le posizioni scoperte per affettare (slice) il testo
         for i, (start_idx, name) in enumerate(pilot_positions):
-            # La fine del blocco è l'inizio del pilota successivo (o la fine del documento)
-            end_idx = pilot_positions[i + 1][0] if i + 1 < len(pilot_positions) else len(text)
-            pilot_block = text[start_idx:end_idx]
-
-            # Estraiamo i tempi giro da questo specifico blocco
-            lap_times = Analyzer.extract_lap_times_strings(pilot_block)
-
-            # Se ci sono tempi, aggiungiamo il pilota alla lista finale
-            if lap_times:
-                pilots_data.append((name, lap_times))
-
-        return pilots_data
-
-    @staticmethod
-    def get_all_tracks_per_year(year):
-        urls = [
-            f"{BASE_URL}/{year}/SPA/MotoGP/RAC/worldstanding.pdf",
-            f"{BASE_URL}/{year}/MotoGP/SPA/world%2bstanding.pdf",
-        ]
-
-        for url in urls:
-            response = requests.get(url)
-            if response.status_code != 200:
-                logger.warning(f"Impossible to download PDF from: {url}")
-                continue
-
-            logger.info(f"PDF downloaded from: {url}")
-
-            text = PdfReader(BytesIO(response.content)).pages[0].extract_text()
-
-            blocks = re.findall(
-                r"(?:\b[A-Z][A-Z0-9]{2}\b(?:\s+|$)){2,}",
-                text
+            end_idx = (
+                pilot_positions[i + 1][0]
+                if i + 1 < len(pilot_positions)
+                else len(text)
             )
+            pilot_block = text[start_idx:end_idx]
+            lap_times = self._extract_lap_times_strings(pilot_block)
 
-        return max(blocks, key=len).split()
+            if lap_times:
+                rider_uuid = rider_uuid_by_name.get(name, "")
+                visuals = get_rider_visuals(rider_uuid, self.year)
+                pilots_data.append({
+                    "name":    name,
+                    "times":   lap_times,
+                    "visuals": visuals,
+                })
+
+        return {
+            "year": self.year,
+            "gp_name": self.gp_name,
+            "session_type": self.session_type,
+            "pilots": pilots_data
+        }

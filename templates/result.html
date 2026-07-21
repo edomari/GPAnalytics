@@ -1,14 +1,110 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MotoGPStats</title>
+    <link rel="icon" type="image/png" href="/static/images/logo_small.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ── Pilot hero header ───────────────────────────────────────── */
+        .pilot-hero {
+            position: relative;
+            min-height: 110px;
+            border-radius: 6px 6px 0 0;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            margin: -1.1rem -1.1rem 0.9rem;   /* bleed out of .pilot padding */
+        }
+
+        .pilot-hero-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.35;
+        }
+
+        .rider-photo {
+            position: absolute;
+            right: -50px;
+            top: 0;
+            height: 100%;
+            width: 50%;
+            object-fit: cover;
+            object-position: top center;
+
+            mask-image: linear-gradient(to left, black 60%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to left, black 60%, transparent 100%);
+        }
+
+        .rider-number-img {
+            height: 36px;
+            object-fit: contain;
+        }
+
+        .pilot-hero-meta {
+            position: relative;   /* above .pilot-hero-bg */
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.8rem 1rem;
+            width: 100%;
+        }
+
+        .pilot-pos-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pilot-hero .pilot-pos {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.2rem 0.45rem;
+            border-radius: 3px;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(4px);
+            flex-shrink: 0;
+        }
+
+        /* Gold/silver/bronze for podium positions */
+        .pilot[data-pilot-index="0"] .pilot-hero .pilot-pos { background: linear-gradient(135deg,#ffe169,#b8860b); color:#1a1a1a; }
+        .pilot[data-pilot-index="1"] .pilot-hero .pilot-pos { background: linear-gradient(135deg,#e6e6e6,#9a9a9a); color:#1a1a1a; }
+        .pilot[data-pilot-index="2"] .pilot-hero .pilot-pos { background: linear-gradient(135deg,#d99657,#8b5a2b); color:#1a1a1a; }
+
+        .pilot-hero h2 {
+            font-family: 'Oswald', 'MioFont', sans-serif;
+            font-weight: 700;
+            font-style: italic;
+            text-transform: uppercase;
+            font-size: 1rem;
+            margin: 0;
+            text-align: left;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+        }
+
+        .pilot-hero-team {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.62rem;
+            opacity: 0.75;
+            letter-spacing: 0.04em;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+        }
+
+        /* Fallback when no team color is available */
+        .pilot-hero-fallback {
+            background: var(--asphalt-600);
+            color: var(--paper);
+        }
+    </style>
 </head>
 <body class="results">
     <script src="/static/js/script.js"></script>
@@ -16,69 +112,99 @@
     <div class="results-bg" aria-hidden="true"></div>
 
     <header class="results-header">
-        <a href="/" class="back-link">&larr; Cambia gara</a>
-        <p class="results-eyebrow">MotoGPStats // Cronometraggio</p>
-        <span class="session-badge {{ 'sprint' if sessionType == 'SPR' else 'race' }}">
-            {{ 'Sprint Race' if sessionType == 'SPR' else 'Race' }}
-        </span>
-        <h1 class="results-title">{{ granPrix }} <span>{{ year }}</span></h1>
-        <p class="results-sub">Tocca un giro per includerlo o escluderlo dal passo gara</p>
+        <a href="/" class="back-link">&larr; Change race</a>
+        <p class="results-eyebrow">MotoGPStats // Timing</p>
+
+        <span class="session-badge">{{ result.session_type }}</span>
+
+        <h1 class="results-title">{{ result.gp_name }} <span>{{ result.year }}</span></h1>
+        <p class="results-sub">Tap a lap to include or exclude it from the race pace</p>
 
         <button type="button" class="global-action-btn" aria-pressed="false" onclick="toggleAllFirstLaps(this)">
-            Escludi il giro 1 per tutti i piloti
+            Exclude lap 1 for all riders
         </button>
     </header>
 
     <main class="grid-stage">
-        {% set pilots_data = process_pilots_data(year, granPrix, sessionType) %}
-        {% for i in range(0, pilots_data|length, 3) %}
+        {% for i in range(0, result.pilots|length, 3) %}
             <div class="pilots-row">
                 {% for j in range(3) %}
                     {% set pilot_index = i + j %}
-                    {% if pilot_index < pilots_data|length %}
-                        {% set pilot_name, pilot_times = pilots_data[pilot_index] %}
+                    {% if pilot_index < result.pilots|length %}
+                        {% set pilot = result.pilots[pilot_index] %}
+                        {% set v = pilot.visuals %}
                         <div class="pilot" data-pilot-index="{{ pilot_index }}">
 
-                            <div class="pilot-head">
-                                <span class="pilot-pos">P{{ pilot_index + 1 }}</span>
-                                <h2>{{ pilot_name }}</h2>
+                            {# ── Hero header ── #}
+                            <div class="pilot-hero {% if not v.get('team_color') %}pilot-hero-fallback{% endif %}"
+                                 style="{% if v.get('team_color') %}background-color: {{ v.team_color }};{% endif %}
+                                        color: {{ v.get('team_text_color') or '#f2f1ec' }};">
+
+                                {# Team background texture #}
+                                {% if v.get('team_bg') %}
+                                <div class="pilot-hero-bg"
+                                     style="background-image: url('{{ v.team_bg }}');"></div>
+                                {% endif %}
+
+                                {# Rider photo — fades on the right side #}
+                                {% if v.get('photo') %}
+                                <img class="rider-photo"
+                                     src="{{ v.photo }}"
+                                     alt="{{ pilot.name }}"
+                                     loading="lazy">
+                                {% endif %}
+
+                                <div class="pilot-hero-meta">
+                                    <div class="pilot-pos-row">
+                                        <span class="pilot-pos">P{{ pilot_index + 1 }}</span>
+                                        {% if v.get('number_img') %}
+                                        <img class="rider-number-img"
+                                             src="{{ v.number_img }}"
+                                             alt="number"
+                                             loading="lazy">
+                                        {% endif %}
+                                    </div>
+                                    <h2>{{ pilot.name }}</h2>
+                                    {% if v.get('team_name') %}
+                                    <span class="pilot-hero-team">{{ v.team_name }}</span>
+                                    {% endif %}
+                                </div>
                             </div>
 
                             <script>
-                                // Inizializzare i tempi selezionati per ogni pilota
                                 document.addEventListener('DOMContentLoaded', function() {
-                                    initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot_times|length) %}'{{ pilot_times[k] }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
+                                    initializeSelectedTimes({{ pilot_index }}, [{% for k in range(pilot.times|length) %}'{{ pilot.times[k] }}'{% if not loop.last %}, {% endif %}{% endfor %}]);
                                 });
                             </script>
 
                             <div class="laps-list">
-                                {% for k in range(pilot_times|length) %}
+                                {% for k in range(pilot.times|length) %}
                                     <div class="lap-time" data-lap-index="{{ k }}">
-                                        <span class="lap-label">Giro {{ k + 1 }}</span>
-                                        <span class="lap-value">{{ pilot_times[k] }}</span>
+                                        <span class="lap-label">Lap {{ k + 1 }}</span>
+                                        <span class="lap-value">{{ pilot.times[k] }}</span>
                                         <button class="selected"
-                                                aria-label="Includi o escludi il giro {{ k + 1 }} dal passo gara"
-                                                onclick="toggleLapTime({{ pilot_index }}, '{{ pilot_times[k] }}', this)">...</button>
+                                                aria-label="Include or exclude lap {{ k + 1 }} from race pace"
+                                                onclick="toggleLapTime({{ pilot_index }}, '{{ pilot.times[k] }}', this)">...</button>
                                     </div>
                                 {% endfor %}
                             </div>
 
                             <div class="stat-strip">
-                                <div class="average-time" id="average-time-{{ pilot_index }}">Passo gara: Non selezionato</div>
-                                <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Giro più veloce: Non selezionato</div>
-                                <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Giro più lento: Non selezionato</div>
+                                <div class="average-time" id="average-time-{{ pilot_index }}">Race pace: Not selected</div>
+                                <div class="fastest-lap" id="fastest-lap-{{ pilot_index }}">Fastest lap: Not selected</div>
+                                <div class="slowest-lap" id="slowest-lap-{{ pilot_index }}">Slowest lap: Not selected</div>
                             </div>
 
                             <div class="chart-toggle-wrap">
                                 <button type="button"
                                         class="chart-toggle-btn"
                                         aria-expanded="false"
-                                        onclick="toggleChart({{ pilot_index }}, this)">Mostra grafico</button>
+                                        onclick="toggleChart({{ pilot_index }}, this)">Show chart</button>
                             </div>
 
                             <div class="chart-panel" id="chart-panel-{{ pilot_index }}">
                                 <canvas id="chart-{{ pilot_index }}"></canvas>
-                                <p class="chart-note">Il primo giro è escluso dal grafico</p>
+                                <p class="chart-note">The first lap is excluded from the chart</p>
                             </div>
                         </div>
                     {% endif %}

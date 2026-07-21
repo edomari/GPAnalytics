@@ -1,183 +1,237 @@
+"""
+Extraction of the entry list (registered riders) via the MotoGP API (PulseLive).
+"""
+import functools
 import logging
-from io import BytesIO
-
-from pypdf import PdfReader
-import re
-import regex
-
-from utils.http_client import download_first_available_pdf
+import requests
+from dataclasses import dataclass
+from typing import List
+from config import config
 
 logger = logging.getLogger(__name__)
 
 
-def _pattern_for_year(year):
+@dataclass(frozen=True)
+class Rider:
     """
-    Restituisce la regex compilata adatta a parsare l'entry list per un dato anno:
-    il formato del PDF MotoGP è cambiato più volte nel tempo, quindi servono pattern diversi.
-
-    :param year: Anno della stagione.
-    :return: Pattern compilato (re o regex) con i gruppi (numero, costruttore, ..., nazionalità[, team]).
+    Represents a rider entered in an event.
     """
-    """if year < 2008:
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero pilota
-            r'([A-Z0-9]+)\s*'  # 2. Costruttore
-            r'(.*?)\s*'  # 3. TEAM (Cattura tutto fino al cognome)
-            # Nella regex per anni < 2008, cambia la parte del nome/cognome così:
-            r'([A-Z]+(?:\s+[A-Z]+)*)\s+'  # 4. Cognome (Tutto maiuscolo)
-            r'((?:\p{Lu}\p{Ll}+)(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # 5. Nome (Gestisce spazi tra Jose e Luis)
-            r'([A-Z]{3})'  # 6. Nazionalità
-        )"""
-    if year <= 2010:
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero
-            r'(HONDA|YAMAHA|SUZUKI|DUCATI|KAWASAKI|APRILIA|KTM|[A-Z0-9&]+)\s*'  # 2. Costruttore
-            r'('  # 3. TEAM
-            r'.*?(?:MotoGP|LCR|HRC|SRT)'  # Opzione A: suffissi maiuscoli noti
-            r'|'
-            r'.*?[a-z0-9]'  # Opzione B: finisce in minuscola o numero
-            r')\s*'
-            r'([A-Z]+(?:\s+[A-Z]+)*)\s+'  # 4. Cognome (Tutto maiuscolo)
-            r'((?:\p{Lu}\p{Ll}+)(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # 5. Nome (Gestisce spazi tra Jose e Luis)
-            r'([A-Z]{3})'
-            # 6. Nazionalità
-        )
-    if year <= 2012:
-        # Regex calibrata per l'era CRT (2012 e precedenti)
-        # Costruttore, Team e Cognome fusi, costruttori con trattini (BQR-FTR), e sporcizia a fine riga
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero pilota
-            # 2. Costruttori (Aggiunti i telai CRT come BQR-FTR)
-            r'(BQR-FTR|HONDA|YAMAHA|SUTER|DUCATI|IODA|ART|FTR|[A-Z0-9-]+)\s*'
-            r'('  # 3. TEAM (Inizio gruppo)
-            r'.*?(?:MotoGP)'  # Opzione A: Il team finisce in Maiuscolo (es. LCR Honda MotoGP)
-            r'|'  # OPPURE
-            r'.*?[a-z0-9]'  # Opzione B: Il team finisce con minuscola o numero (es. Blusens, Racing)
-            r')\s*'  # (Fine gruppo TEAM) + spazi opzionali
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # 4. Cognome (Tutto maiuscolo)
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # 5. Nome (Inizia con Maiuscola)
-            r'([A-Z]{3})'  # 6. Nazionalità
-            # Non mettiamo vincoli stringenti dopo la nazionalità per ignorare le lettere extra (es. "r i")
-        )
-    if year == 2013:
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero pilota
-            # 2. Costruttori (IMPORTANTE: I nomi composti più lunghi vanno per primi!)
-            r'(FTR KAWASAKI|FTR HONDA|IODA-SUTER|DUCATI|HONDA|YAMAHA|ART|FTR|PBM|[A-Z0-9-]+)\s*'
-            r'('  # 3. TEAM (Inizio gruppo)
-            r'.*?(?:MotoGP)'  # Opzione A: Il team finisce in Maiuscolo (LCR Honda MotoGP)
-            r'|'  # OPPURE
-            r'.*?[a-z0-9]'  # Opzione B: Il team finisce con minuscola o numero (Team, Racing, Tech 3)
-            r')\s*'  # (Fine gruppo TEAM) + spazi opzionali
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # 4. Cognome (Tutto maiuscolo)
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # 5. Nome (Inizia con Maiuscola)
-            r'([A-Z]{3})'  # 6. Nazionalità
-        )
-    if year <= 2015:
-        # Regex calibrata per PDF <= 2015 (Senza Nickname, Costruttore/Team/Cognome incollati)
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero pilota
-            # 2. Costruttore (Cattura i noti di quell'epoca, incluso Yamaha Forward che ha lo spazio)
-            r'(ART|Aprilia|Ducati|Honda|Suzuki|Yamaha(?: Forward)?|[A-Za-z0-9]+)\s*'
-            r'('  # 3. TEAM (Inizio gruppo)
-            r'.*?(?:MotoGP|VDS|LCR|HRC)'  # Opzione A: suffissi del Team che finiscono in Maiuscolo
-            r'|'  # OPPURE
-            r'.*?[a-z0-9]'  # Opzione B: suffissi del Team che finiscono con lettera minuscola o numero (es. "Racing", "Team", "Tech 3")
-            r')\s*'  # (Fine gruppo TEAM) + spazi opzionali
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # 4. Cognome (Tutto maiuscolo, richiede spazio dopo per staccarsi dal Nome)
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # 5. Nome (Inizia con Maiuscola, richiede spazio dopo)
-            r'([A-Z]{3})'  # 6. Nazionalità (3 lettere)
-        )
-    if year <= 2019:
-        # Regex calibrata per gestire Team e Cognome incollati (es. "SRTQUARTARARO" o "RacingBAGNAIA")
-        return regex.compile(
-            r'^(\d+)\s+'  # 1. Numero pilota
-            r'(APRILIA|DUCATI|HONDA|KTM|SUZUKI|YAMAHA|[A-Z0-9&]+)\s*'  # 2. Costruttore
-            r'('  # 3. TEAM (Inizio gruppo)
-            r'.*?(?:MotoGP|SRT|IDEMITSU|CASTROL|ECSTAR|HRC|VDS|IODA|PRAMAC|ASPAR|GRESINI)'  # Opzione A: suffissi noti tutti maiuscoli
-            r'|'  # OPPURE
-            r'.*?[a-z0-9]'  # Opzione B: finisce con lettera minuscola o numero (es. "Racing", "Tech 3")
-            r')\s*'  # (Fine gruppo TEAM) + spazi opzionali
-            r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s*'  # 4. Cognome (Tutto maiuscolo)
-            r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s*'  # 5. Nome
-            r'\([A-Za-zÀ-ÿ]{3,}\)\s*'  # Nickname tra parentesi (es. (Dov)) - Non catturato
-            r'([A-Z]{3,4})'  # 6. Nazionalità
-        )
+    id: str
+    number: str
+    constructor: str
+    team: str
+    surname: str
+    name: str
+    nationality: str
 
-    # Regex per anni > 2019 (Include fix per costruttore e cognome uniti)
-    return regex.compile(
-        r'^(\d+)\s+'  # numero pilota
-        # Costruttore (cerca prima quelli noti, poi fallback generico) con spazio opzionale \s*
-        r'(APRILIA|DUCATI|HONDA|KTM|SUZUKI|YAMAHA|GASGAS|KALEX|BOSCOSCURO|HUSQVARNA|CFMOTO|[A-Z0-9&]+)\s*'
-        r'(\p{Lu}{2,}(?:\s+\p{Lu}{2,})?)\s+'  # cognome
-        r'(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)*)\s+'  # nome
-        r'\([A-Za-zÀ-ÿ]+\)\s+'  # nickname
-        r'([A-Z]{3,4})'  # nazionalità
-        r'(.+)$'  # team
+    @property
+    def full_name(self) -> str:
+        """
+        Gets the rider's full name.
+
+        :return: The combined name and surname, stripped of extra spaces.
+        :rtype: str
+        """
+        return f"{self.name} {self.surname}".strip()
+
+
+def get_riders_info(event_id: str, category_id: str, session_id: str = "", year: int = 0) -> List[Rider]:
+    """
+    Retrieves the entry list for a specific event and category.
+
+    Strategy:
+    1. Tries the v2/entries endpoint (complete entry data).
+    2. If no riders are found, falls back to the v1 classification endpoint
+       (available for older sessions or when entries are not populated).
+
+    :param event_id: The UUID of the event.
+    :type event_id: str
+    :param category_id: The UUID of the category.
+    :type category_id: str
+    :param session_id: The UUID of the session (required for fallback).
+    :type session_id: str
+    :param year: The season year (required for fallback).
+    :type year: int
+    :return: A list of Rider objects, or an empty list if both endpoints fail.
+    :rtype: list
+    """
+    riders = _get_riders_from_entries(event_id, category_id)
+    if riders:
+        return riders
+
+    logger.info(
+        "Empty entries for event %s — trying classification fallback (session %s)",
+        event_id, session_id,
     )
+    return _get_riders_from_classification(session_id, year)
 
-def get_riders_info(year, gp_name, category):
+
+def _get_riders_from_entries(event_id: str, category_id: str) -> List[Rider]:
     """
-    Scarica l'entry list (entry.pdf) di un GP/anno/categoria e ne estrae i piloti iscritti.
+    Attempts to fetch riders from the v2/entries endpoint.
 
-    :param year: Anno della stagione.
-    :param gp_name: Nome del Gran Prix.
-    :param category: Categoria (es. "MotoGP").
-    :return: Lista di [numero, costruttore, team, cognome, nome, nazionalità] per ogni pilota,
-             oppure [] se l'entry list non è scaricabile.
+    :param event_id: The UUID of the event.
+    :type event_id: str
+    :param category_id: The UUID of the category.
+    :type category_id: str
+    :return: A list of Rider objects found (empty list if the request fails).
+    :rtype: list
     """
-    base_url = "https://resources.motogp.com/files/results"
-    pattern = _pattern_for_year(year)
-
-    urls = [
-        f"{base_url}/{year}/{gp_name}/{category}/entry.pdf",
-        f"{base_url}/{year}/{category}/{gp_name}/entry.pdf",
-        f"{base_url}/{year}/{gp_name}/{category}/Entry.pdf",
-        f"{base_url}/{year}/{category}/{gp_name}/Entry.pdf",
-    ]
-
-    pdf_data = download_first_available_pdf(urls)
-    if pdf_data is None:
+    url = f"{config.API_ENTRIES_URL}?categoryId={category_id}&eventId={event_id}"
+    try:
+        resp = requests.get(url, headers=config.HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.error("Error fetching v2 entry list: %s", e)
         return []
 
-    text = PdfReader(pdf_data).pages[0].extract_text()
-    print(text)
-    all_riders = []
-    for line in text.split('\n'):
-        rider = pattern.match(line)
-        if not rider:
+    riders: List[Rider] = []
+    for entry in data.get("entry", []):
+        rider_data = entry.get("rider", {})
+        full_name = rider_data.get("full_name", "").strip()
+        if not full_name:
             continue
 
-        if year <= 2019:
-            number, constructor, team, surname, name, nationality = rider.groups()
-        else:
-            number, constructor, surname, name, nationality, team = rider.groups()
-            team = regex.sub(r'^\s*[*r]*\s*R\(\d+\)\s*', '', team)
-            team = regex.sub(r'^\s*[*r]+\s*', '', team)
-            team = team.strip()
+        name_parts = full_name.split(" ", 1)
+        name = name_parts[0]
+        surname = name_parts[1] if len(name_parts) > 1 else ""
 
-        # 1. Pulisci il prefisso 'GP' dal cognome
-        if surname.startswith('GP'):
-            surname = surname[2:]
+        riders.append(Rider(
+            id=entry.get("rider", {}).get("riders_id", ""),
+            number=str(entry.get("number", rider_data.get("number", ""))),
+            constructor=entry.get("constructor", {}).get("name", ""),
+            team=entry.get("team_name", ""),
+            surname=surname,
+            name=name,
+            nationality=rider_data.get("country", {}).get("iso", ""),
+        ))
+    return riders
 
-        # 2. Recupera prefissi come 'Mc' o 'De' se finiti nel team (es. 'X3Ilmor SRTMc')
-        # Questa regex controlla se il team finisce con un prefisso noto
-        match_prefix = re.search(r'(Mc)$', team, re.IGNORECASE)
-        if match_prefix:
-            prefix = match_prefix.group(1)
-            team = team[:-len(prefix)].strip()
-            surname = prefix + surname
 
-        # 3. Separazione automatica nomi/cognomi incollati (JoseLuis -> Jose Luis)
-        # La '?' dopo il gruppo di cattura rende la regex più flessibile
-        name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
-        surname = re.sub(r'([a-z])([A-Z])', r'\1 \2', surname)
+def _get_riders_from_classification(session_id: str, year: int) -> List[Rider]:
+    """
+    Fallback method: extracts rider names from the v1 classification endpoint.
 
-        # 4. Normalizzazione finale
-        surname = surname.strip()
-        name = name.strip()
+    :param session_id: The UUID of the session.
+    :type session_id: str
+    :param year: The season year.
+    :type year: int
+    :return: A list of Rider objects extracted from the classification (empty list if it fails).
+    :rtype: list
+    """
+    if not session_id:
+        logger.warning("Missing session_id: unable to use classification fallback")
+        return []
 
-        team = team.replace('* ', '').replace('W     ', '')
-        all_riders.append([number, constructor, team, surname, name, nationality])
+    url = (
+        f"{config.API_BASE_URL}/results/session/{session_id}"
+        f"/classification"
+    )
+    try:
+        resp = requests.get(url, headers=config.HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        logger.info("Found url: %s", url)
+    except Exception as e:
+        logger.error("Error in classification fallback (session %s): %s", session_id, e)
+        return []
 
-    return all_riders
+    riders: List[Rider] = []
+    for entry in data.get("classification", []):
+        rider_data = entry.get("rider", {})
+        full_name = rider_data.get("full_name", "").strip()
+        if not full_name:
+            continue
+
+        name_parts = full_name.split(" ", 1)
+        name = name_parts[0]
+        surname = name_parts[1] if len(name_parts) > 1 else ""
+
+        riders.append(Rider(
+            id=entry.get("rider", {}).get("riders_id", ""),
+            number=str(rider_data.get("number") or ""),
+            constructor=entry.get("constructor", {}).get("name", ""),
+            team=(entry.get("team") or {}).get("name", ""),
+            surname=surname,
+            name=name,
+            nationality=rider_data.get("country", {}).get("iso", ""),
+        ))
+    return riders
+
+
+@functools.lru_cache(maxsize=256)
+def get_rider_visuals(rider_uuid: str, year: int) -> dict:
+    """
+    Retrieves visual and team information for a specific rider and year.
+
+    Fetches the rider's career profile and attempts to extract photos,
+    team colors, and background images, prioritizing the specified year
+    and falling back to other years if necessary.
+
+    :param rider_uuid: The UUID of the rider.
+    :type rider_uuid: str
+    :param year: The target season year.
+    :type year: int
+    :return: A dictionary containing 'photo', 'team_color', 'team_text_color', 'team_bg', and 'team_name'.
+    :rtype: dict
+    """
+    if not rider_uuid:
+        return {}
+
+    url = f"{config.API_BASE_URL}/riders/{rider_uuid}"
+    try:
+        resp = requests.get(url, headers=config.HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        logger.warning("Unable to fetch visuals for rider %s: %s", rider_uuid, exc)
+        return {}
+
+    career = data.get("career", [])
+    if not career:
+        return {}
+
+    career_sorted = sorted(career, key=lambda x: x.get("season", 0), reverse=True)
+    target_entry = next((c for c in career if c.get("season") == year), None)
+
+    # Helper function including 'portrait' logic
+    def get_photo_path():
+        # 1. First try the portrait field in the target year (specific to your request)
+        if target_entry:
+            val = (target_entry.get("pictures") or {}).get("portrait")
+            if val: return val
+
+            # 2. Then try the profile.main field in the target year
+            val = (target_entry.get("pictures") or {}).get("profile", {}).get("main")
+            if val: return val
+
+        # 3. Fallback: search across the entire career
+        for entry in career_sorted:
+            pics = entry.get("pictures") or {}
+            # Prioritize the portrait even in the fallback
+            val = pics.get("portrait") or pics.get("profile", {}).get("main")
+            if val: return val
+        return ""
+
+    def get_field(path_keys, default=""):
+        if target_entry:
+            val = target_entry
+            for key in path_keys:
+                val = (val or {}).get(key)
+            if val: return val
+
+        for entry in career_sorted:
+            val = entry
+            for key in path_keys:
+                val = (val or {}).get(key)
+            if val: return val
+        return default
+
+    return {
+        "photo": get_photo_path(),  # Uses the custom logic that prefers the portrait
+        "team_color": get_field(["team", "color"]),
+        "team_text_color": get_field(["team", "text_color"]),
+        "team_bg": get_field(["team", "background_picture"]),
+        "team_name": get_field(["team", "name"]),
+    }
